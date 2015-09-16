@@ -1,0 +1,14 @@
+
+
+
+
+
+scan 'hogzilla_flows', {COLUMNS => ['flow:lower_name','flow:upper_name','flow:detected_protocol','flow:bytes','flow:host_server_name','flow:packets'],
+FILTER => "(SingleColumnValueFilter('flow','detected_protocol',=,'regexstring:.*5/DNS.*',true,true))   AND (SingleColumnValueFilter('flow','bytes',=,'regexstring:......*',true,true))",
+LIMIT => 10}
+
+
+
+scan 'hogzilla_flows', {COLUMNS => ['flow:lower_name','flow:upper_name','flow:detected_protocol','flow:bytes','flow:host_server_name','flow:packets','event:signature_id'],
+FILTER => "(SingleColumnValueFilter('flow','detected_protocol',=,'regexstring:.*5.178/DNS.Amazon.*',true,true))   AND (SingleColumnValueFilter('flow','bytes',=,'regexstring:......*',true,true))",
+LIMIT => 10}
