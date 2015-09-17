@@ -12,3 +12,24 @@ LIMIT => 10}
 scan 'hogzilla_flows', {COLUMNS => ['flow:lower_name','flow:upper_name','flow:detected_protocol','flow:bytes','flow:host_server_name','flow:packets','event:signature_id'],
 FILTER => "(SingleColumnValueFilter('flow','detected_protocol',=,'regexstring:.*5.178/DNS.Amazon.*',true,true))   AND (SingleColumnValueFilter('flow','bytes',=,'regexstring:......*',true,true))",
 LIMIT => 10}
+
+scan 'hogzilla_flows', {COLUMNS => ['flow:lower_name','flow:upper_name','flow:detected_protocol','flow:lower_port',
+                                    'flow:bytes','flow:host_server_name','flow:packets','event:signature_id',
+                                    'flow:dns_num_ret_code'],
+FILTER => "(SingleColumnValueFilter('flow','lower_port',=,'regexstring:53',true,true))   AND (SingleColumnValueFilter('flow','dns_num_ret_code',!=,'regexstring:xyz',true,true))",
+LIMIT => 10}
+
+scan 'hogzilla_flows', {COLUMNS => ['flow:lower_name','flow:upper_name','flow:detected_protocol','flow:lower_port',
+                                    'flow:bytes','flow:host_server_name','flow:packets','event:signature_id',
+                                    'flow:dns_ret_code','flow:packets_without_payload'],
+FILTER => "(SingleColumnValueFilter('flow','lower_port',=,'regexstring:53',true,true))",
+LIMIT => 10}
+
+COLUMNS => ['flow:lower_name','flow:upper_name','flow:detected_protocol','flow:lower_port',
+                                    'flow:bytes','flow:host_server_name','flow:packets','event:signature_id',
+                                    'flow:dns_ret_code','flow:packets_without_payload','flow:host_server_name'],
+                                    
+scan 'hogzilla_flows', {
+FILTER => "(SingleColumnValueFilter('flow','lower_port',=,'regexstring:53',true,true)) AND (SingleColumnValueFilter('flow','host_server_name',=,'regexstring:msnsolution.nicaze.net',true,true))",
+LIMIT => 1}
+
