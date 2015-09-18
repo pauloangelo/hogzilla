@@ -26,6 +26,25 @@ object HogDNS {
  
   }
   
+  def populate(event:HogEvent):HogEvent =
+  {
+    val centroids:String = event.data.get("centroids")
+    val vector:String = event.data.get("vector")
+    val clusterLabel:String = event.data.get("clusterLabel")
+    val hostname:String = event.data.get("hostname")
+    
+    event.text = "This flow was detected by Hogzilla as an anormal activity.\n"+
+                 ""+hostname+"\n"+
+                 "Event details:\n"+
+                 "Hogzilla module: HogDNS, Method: k-means clustering with k=10\n"+
+                 "Centroids:"+centroids+"\n"
+                 "Vector: "+vector+"\n"
+                 "(cluster,label nDPI): "+clusterLabel+"\n"
+                 
+    event
+  }
+  
+  
   def kmeans(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)])
   {
  
@@ -56,7 +75,8 @@ object HogDNS {
                                 flow.get("flow:avg_inter_time").toDouble,
                                 flow.get("flow:flow_duration").toDouble,
                                 flow.get("flow:max_packet_size").toDouble,
-                                flow.get("flow:flow_duration").toDouble,
+                                flow.get("flow:bytes").toDouble,
+                                flow.get("flow:packets").toDouble,
                                 flow.get("flow:min_packet_size").toDouble,
                                 flow.get("flow:packet_size-0").toDouble,
                                 flow.get("flow:inter_time-0").toDouble,
@@ -159,7 +179,8 @@ object HogDNS {
     println("######################################################################################")
     println("DNS K-Means Clustering")
     println("Centroids")
-    model.clusterCenters.foreach { println }
+    val centroids = ""
+    model.clusterCenters.foreach { center => centroids.concat("\n"+center.toString) }
     
     clusterLabelCount.keySet().toArray().foreach { case key:(Int,String) =>  
       val cluster = key._1
@@ -180,7 +201,11 @@ object HogDNS {
       clusterLabel.filter({ case (cluster,(group,taited,hostname,flow),datum) => (cluster,group).equals(dirty) }).
       foreach{ case (cluster,(group,taited,hostname,flow),datum) => 
         val event = new HogEvent(flow)
-        event.alert()
+        event.data.put("centroids", centroids)
+        event.data.put("vector", datum.toString)
+        event.data.put("clusterLabel", "("+cluster.toString()+","+group+")")
+        event.data.put("hostname", flow.get("flow:host_server_name"))
+        populate(event).alert()
       }
 
       
@@ -215,11 +240,6 @@ object HogDNS {
 
   }
   
-  def x(event:HogEvent):HogEvent =
-  {
-    event.description = ""
-    event
-  }
   
   
   def kmeansBytes(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)])

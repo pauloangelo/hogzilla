@@ -26,6 +26,8 @@ object HogHBaseRDD {
   // "flow:inter_time-%d","flow:packet_size-%d"
 
   val hogzilla_flows = new HTable(conf,"hogzilla_flows")
+  val hogzilla_events = new HTable(conf,"hogzilla_events")
+
   
   def connect(spark: SparkContext):RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)]=
   {

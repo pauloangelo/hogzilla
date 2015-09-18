@@ -3,28 +3,42 @@ package org.hogzilla.event
 
 import java.util.HashMap
 import java.util.Map
+import org.apache.hadoop.hbase.client.RowMutations
+import org.hogzilla.hbase.HogHBaseRDD
+import org.apache.hadoop.hbase.util.Bytes
+import org.apache.hadoop.hbase.client.Put
 
-   
- class HogEvent(flow:Map[String,String]) 
-  {
-    var sensorid:Int=0;
-    var eventsecond:Int=0;
-    var signatureid:Int=0;
-    var generatorid:Int=0;
-    var priorityid:Int=0;
-    var description:String="";
-    
-    def alert()
-    {
-     println(flow.get("flow:host_server_name"))    
-     /*
-      * iph
-      * sig info
-      * udph
-      * refs url -> hog/xxx/xxx
-      * payload -> txt
-      *
-    
+
+class HogEvent(flow:Map[String,String]) 
+{
+	var sensorid:Int=0
+			var eventsecond:Int=0
+			var signatureid:Int=0
+			var generatorid:Int=0
+			var priorityid:Int=0
+			var text:String=""
+			var data:Map[String,String]=new HashMap()
+
+   def alert()
+   {
+	   println(flow.get("flow:host_server_name"))    
+
+
+	  // val mutation = new RowMutations()
+     val put = new Put(Bytes.toBytes(flow.get("flow:id")))
+     put.add(Bytes.toBytes("event"), Bytes.toBytes("text"), Bytes.toBytes(text))
+     //mutation.add(put)
+     HogHBaseRDD.hogzilla_events.put(put)
+
+
+	/*
+	 * iph
+	 * sig info
+	 * udph
+	 * refs url -> hog/xxx/xxx
+	 * payload -> txt
+	 *
+
  select * from event limit 2;
 +-----+----------+-----------+-------------------+-------------+---------+-------------+------+------------------+---------------------+----------+
 | sid | cid      | signature | classification_id | users_count | user_id | notes_count | type | number_of_events | timestamp           | id       |
@@ -53,7 +67,7 @@ select * from reference limit 10;
 |      1 |             1 | 219     |
 |      2 |             1 | 480     |
 |   6214 |             8 | www.virustotal.com/file/4DA4DB7C7547859B48FCEE2D4E0827983161F3FA04FA87BBFDBA558F9F80F74F/analysis/                                                                                                      |
-    
+
  select * from iphdr limit 1;
 +-----+-----+------------+-----------+--------+---------+--------+--------+-------+----------+--------+--------+----------+---------+
 | sid | cid | ip_src     | ip_dst    | ip_ver | ip_hlen | ip_tos | ip_len | ip_id | ip_flags | ip_off | ip_ttl | ip_proto | ip_csum |
@@ -62,15 +76,31 @@ select * from reference limit 10;
 +-----+-----+------------+-----------+--------+---------+--------+--------+-------+----------+--------+--------+----------+---------+
 1 row in set (0.01 sec)
 
-[8.97974739250669   E-8 ,0.0,-9.161339947226096E-9 ,-1.725042389384666E-9  ,-1.1660366428679493E-5,-2.229284513010911E-6 ,-0.002875644572949017  ,-0.005013801929719776,1.823236922235471E-7,-1.3128700961041514E-4]
-[1.2812717236727291 E-5 ,0.0,1.2675627898552595E-6 ,4.452141478628816E-7   ,-0.006167504344889899 ,-4.6835598586131906E-4,-0.0029335899933831118 ,2.512976513079738,-1.962487009383782E-4,-0.001103659917449222]
-[-1.234417779858775 E-5 ,0.0,6.846817775242353 E-7 ,8.604358097621837E-8   ,0.0024077814825695606 ,1.61881887389243E-4   ,0.2856760327445778     ,-0.005013801929718057,3.0529630850474663E-7,-0.0011036599174492226]
-[2.880208599895408  E-5 ,0.0,-9.739875129754096E-8 ,-2.1957736563679425E-8 ,0.002407781482569555  ,0.0101534843839657    ,-0.0029335899933831113 ,-0.00501380192971805,0.0014016942052507849,0.8699496158717259]
-[-6.0026104177287904E-6 ,0.0,3.324172311233422 E-9 ,-4.4666319994555304E-9 ,0.002407781482569555  ,-4.6835598586131814E-4,0.7159475215883521     ,-0.00501380192971805,-1.3512520179453046E-4,-0.0011036599174492233]
-    
-    
-      */
-  
-    }
-  }
+> select * from notes;
++----+------+----------+---------+-------+---------------------+---------------------+
+| id | sid  | cid      | user_id | body  | created_at          | updated_at          |
++----+------+----------+---------+-------+---------------------+---------------------+
+|  2 |    1 | 17307549 |       1 | Teste | 2015-09-18 22:18:19 | 2015-09-18 22:18:19 |
++----+------+----------+---------+-------+---------------------+---------------------+
+
+> select * from signature limit 1;
++--------+--------------+----------------------------------------------------------------------+--------------+---------+---------+---------+--------------+
+| sig_id | sig_class_id | sig_name                                                             | sig_priority | sig_rev | sig_sid | sig_gid | events_count |
++--------+--------------+----------------------------------------------------------------------+--------------+---------+---------+---------+--------------+
+|      1 |            0 | dnp3: DNP3 Application-Layer Fragment uses a reserved function code. |            0 |       1 |       6 |     145 |            0 |
++--------+--------------+----------------------------------------------------------------------+--------------+---------+---------+---------+--------------+
+
+> select * from sig_reference limit 1;
++--------+---------+--------+
+| sig_id | ref_seq | ref_id |
++--------+---------+--------+
+|    509 |       1 |   5460 |
++--------+---------+--------+
+1 row in set (0.00 sec)
+
+
+	 */
+
+}
+}
 
