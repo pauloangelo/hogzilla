@@ -17,15 +17,32 @@ import org.hogzilla.event.HogEvent
 References: http://www.zytrax.com/books/dns/ch15/
  */
 object HogDNS {
-  
+
+  /**
+   * 
+   * 
+   * 
+   */
   def run(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)])
   {
+    
+    // DNS K-means clustering on flow bytes
     //kmeansBytes(HogRDD)
     
+    // DNS Super Bag
+    superbag(HogRDD)
+    
+    // DNS K-means clustering
     kmeans(HogRDD)
  
   }
   
+  
+  /**
+   * 
+   * 
+   * 
+   */
   def populate(event:HogEvent):HogEvent =
   {
     val centroids:String = event.data.get("centroids")
@@ -45,8 +62,30 @@ object HogDNS {
   }
   
   
+  /**
+   * 
+   * 
+   * 
+   */
   def kmeans(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)])
   {
+    
+	  val features = Array("flow:avg_packet_size",
+			                   "flow:packets_without_payload",
+                         "flow:avg_inter_time",
+			                   "flow:flow_duration",
+			                   "flow:max_packet_size",
+			                   "flow:bytes",
+			                   "flow:packets",
+			                   "flow:min_packet_size",
+			                   "flow:packet_size-0",
+			                   "flow:inter_time-0",
+		                     "flow:dns_num_queries",
+			                   "flow:dns_num_answers",
+			                   "flow:dns_ret_code",
+			                   "flow:dns_bad_packet",
+		                 	   "flow:dns_query_type",
+		                 	   "flow:dns_rsp_type")
  
      
     val DnsRDD = HogRDD.
@@ -64,28 +103,11 @@ object HogDNS {
           if(map.get("flow:dns_bad_packet")==null) map.put("flow:dns_bad_packet","0")
           if(map.get("flow:dns_query_type")==null) map.put("flow:dns_query_type","0")
           if(map.get("flow:dns_rsp_type")==null) map.put("flow:dns_rsp_type","0")
-       //   if(map.get("flow:packet_size-0")==null) map.put("flow:packet_size-0","0")
-         // if(map.get("flow:inter_time-0")==null) map.put("flow:inter_time-0","0")
         map
         }
     }.filter(x => x.get("flow:lower_port").equals("53") && x.get("flow:packets").toDouble.>(1)).cache
       
- val DnsRDDcount = DnsRDD.map(flow => Array( flow.get("flow:avg_packet_size").toDouble,
-                                flow.get("flow:packets_without_payload").toDouble,
-                                flow.get("flow:avg_inter_time").toDouble,
-                                flow.get("flow:flow_duration").toDouble,
-                                flow.get("flow:max_packet_size").toDouble,
-                                flow.get("flow:bytes").toDouble,
-                                flow.get("flow:packets").toDouble,
-                                flow.get("flow:min_packet_size").toDouble,
-                                flow.get("flow:packet_size-0").toDouble,
-                                flow.get("flow:inter_time-0").toDouble,
-                                flow.get("flow:dns_num_queries").toDouble,
-                                flow.get("flow:dns_num_answers").toDouble,
-                                flow.get("flow:dns_ret_code").toDouble,
-                                flow.get("flow:dns_bad_packet").toDouble,
-                                flow.get("flow:dns_query_type").toDouble,
-                                flow.get("flow:dns_rsp_type").toDouble)).cache
+  val DnsRDDcount = DnsRDD.map(flow => features.map { feature => flow.get(feature).toDouble }).cache()
   
   val numCols = DnsRDDcount.first.length
   val n = DnsRDDcount.count()
@@ -111,23 +133,8 @@ object HogDNS {
     
 
     val labelAndData = DnsRDD.map { flow => 
-     val vector = Vectors.dense(flow.get("flow:avg_packet_size").toDouble,
-                                flow.get("flow:packets_without_payload").toDouble,
-                                flow.get("flow:avg_inter_time").toDouble,
-                                flow.get("flow:flow_duration").toDouble,
-                                flow.get("flow:max_packet_size").toDouble,
-                                flow.get("flow:flow_duration").toDouble,
-                                flow.get("flow:min_packet_size").toDouble,
-                                flow.get("flow:packet_size-0").toDouble,
-                                flow.get("flow:inter_time-0").toDouble,
-                                flow.get("flow:dns_num_queries").toDouble,
-                                flow.get("flow:dns_num_answers").toDouble,
-                                flow.get("flow:dns_ret_code").toDouble,
-                                flow.get("flow:dns_bad_packet").toDouble,
-                                flow.get("flow:dns_query_type").toDouble,
-                                flow.get("flow:dns_rsp_type").toDouble)
+     val vector = Vectors.dense(features.map { feature => flow.get(feature).toDouble })
     ((flow.get("flow:detected_protocol"), if (flow.get("event:priority_id")!=null && flow.get("event:priority_id").equals("1")) 1 else 0 , flow.get("flow:host_server_name"),flow),normalize(vector))
-   // (flow.get("flow:id"),vector)
     }
     
     val data = labelAndData.values.cache()
@@ -141,15 +148,7 @@ object HogDNS {
         (cluster,label,datum)
     })
     
-      /*
-    val clusterLabelCount = labelAndData.map({
-      case (label,datum) =>
-        val cluster = model.predict(datum)
-        val map: Map[(Int,String),(Double,Int)] = new HashMap[(Int,String),(Double,Int)]
-        map.put((cluster,label._1),  (label._2.toDouble,1))
-        map
-    })*/
-    
+  
     val clusterLabelCount = clusterLabel.map({
       case (cluster,label,datum) =>
         val map: Map[(Int,String),(Double,Int)] = new HashMap[(Int,String),(Double,Int)]
@@ -170,8 +169,6 @@ object HogDNS {
       }
       a
     })
-    
-    //.countByValue
     
     println("######################################################################################")
     println("######################################################################################")
@@ -218,20 +215,6 @@ object HogDNS {
       println("")
    }
 
-    
-    /*clusterLabelCount.toSeq.sorted.foreach {
-     
-      case ((cluster,label),count) =>
-        println(f"Cluster: $cluster%1sLabel: $label%18s Count: $count%8s")
-    }*/
-    
-    //val max = hBaseRDD.map(tuple => tuple._2)
-    //          .map(result => Bytes.toString(result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("packets"))).toLong)
-    //          .reduce((a,b) => Math.max(a,b))
-              
-    //println("Maximo: "+teste)
-  //  teste.toSeq.sortBy(_._2).foreach(println)
-    //teste.foreach(println)
     println("######################################################################################")
     println("######################################################################################")
     println("######################################################################################")
@@ -242,6 +225,11 @@ object HogDNS {
   
   
   
+  /**
+   * 
+   * 
+   * 
+   */
   def kmeansBytes(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)])
   {
  
@@ -327,6 +315,39 @@ object HogDNS {
     println("######################################################################################")           
 
 
+  }
+  
+  
+  
+  
+  
+  /**
+   * 
+   * 
+   * 
+   */
+  def superbag(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)])
+  {
+    class flowSet()
+    {
+      //val flows=new HashMap[(String,String),Array[Map[String,String]]]
+ 
+      def add(flow:Map[String,String])
+      {
+        // Add flow in the Set
+       // if(flows.get((flow.get(""),flow.get(""))).isEmpty )
+         // flows.put((flow.get(""),flow.get("")),new HashMap[String,String])
+         // flows.get((flow.get(""),flow.get(""))).xxx(flow)
+       }
+    }
+    
+    // Populate flowSet
+    
+    // Order and compute sizes, inter times, means and stddevs
+
+    // SVM considering dirty flows from Snort
+    
+    // Taint the dirty side, generating HogEvents
   }
   
 }

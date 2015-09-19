@@ -1,8 +1,11 @@
 
 
 /**
+ * 
+ * 
  * @author pa
-
+ * 
+ * 
  */
 
 import scala.math.random
@@ -18,7 +21,12 @@ import org.hogzilla.hbase._
 import org.hogzilla.dns.HogDNS
 import org.hogzilla.prepare._
 
-
+/**
+ * 
+ * Keep it simple, robust, scalable and useful.
+ * 
+ * 
+ */
 object Hogzilla {
   
   def main(args: Array[String])
@@ -30,10 +38,16 @@ object Hogzilla {
     val HogRDD = HogHBaseRDD.connect(spark);
     
     // Prepare the data
-  //  HogPrepare.prepare(HogRDD)
+    //HogPrepare.prepare(HogRDD)
     
-    // Run algorithms for DNS threats
+    // Run algorithms for DNS protocol
     HogDNS.run(HogRDD);
+    
+    // Run algorithms for HTTP protocol
+    //HogHTTP.run(HogRDD);
+    
+    // Run algorithms for SMTP protocol
+    //HogSMTP.run(HogRDD);
     
     // Stop Spark
     spark.stop()
