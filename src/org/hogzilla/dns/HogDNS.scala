@@ -318,7 +318,12 @@ object HogDNS {
 
   }
   
+<<<<<<< HEAD
     
+=======
+  
+  
+>>>>>>> e4d5138ef1f85f7691781eef3bdee1464b833b60
   
   
   /**
@@ -328,15 +333,22 @@ object HogDNS {
    */
   def superbag(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)])
   {
+<<<<<<< HEAD
     class flowSet(flowc:Map[String,String])
     {
       val flows=new HashMap[(String,String,String),(HashSet[Map[String,String]],HashMap[String,Double])] // (flow:lip,flow:uip,flow:host) -> (Set[flows],Info)
       
       add(flowc)
+=======
+    class flowSet()
+    {
+      //val flows=new HashMap[(String,String),Array[Map[String,String]]]
+>>>>>>> e4d5138ef1f85f7691781eef3bdee1464b833b60
  
       def add(flow:Map[String,String])
       {
         // Add flow in the Set
+<<<<<<< HEAD
         val value = flows.get((flow.get("flow:lower_ip"),flow.get("flow:upper_ip"),flow.get("flow:host_server_name")))
         value._1.add(flow) 
         //value._2.put("qtd",1)
@@ -398,6 +410,21 @@ object HogDNS {
     
     // Taint the dirty side, generating HogEvents
     
+=======
+       // if(flows.get((flow.get(""),flow.get(""))).isEmpty )
+         // flows.put((flow.get(""),flow.get("")),new HashMap[String,String])
+         // flows.get((flow.get(""),flow.get(""))).xxx(flow)
+       }
+    }
+    
+    // Populate flowSet
+    
+    // Order and compute sizes, inter times, means and stddevs
+
+    // SVM considering dirty flows from Snort
+    
+    // Taint the dirty side, generating HogEvents
+>>>>>>> e4d5138ef1f85f7691781eef3bdee1464b833b60
   }
   
 }
