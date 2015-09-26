@@ -41,7 +41,7 @@ object Hogzilla {
     //HogPrepare.prepare(HogRDD)
     
     // Run algorithms for DNS protocol
-    HogDNS.run(HogRDD);
+    HogDNS.run(HogRDD,spark);
     
     // Run algorithms for HTTP protocol
     //HogHTTP.run(HogRDD);

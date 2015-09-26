@@ -12,6 +12,10 @@ import org.apache.spark.rdd.RDD
 import org.hogzilla.hbase.HogHBaseRDD
 import org.hogzilla.event.HogEvent
 import java.util.HashSet
+import org.apache.spark.mllib.regression.LabeledPoint
+import org.apache.spark.mllib.classification.SVMWithSGD
+import scala.tools.nsc.doc.base.comment.OrderedList
+import org.apache.spark.mllib.optimization.L1Updater
 
 /**
  * 
@@ -24,17 +28,17 @@ object HogDNS {
    * 
    * 
    */
-  def run(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)])
+  def run(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)],spark:SparkContext)
   {
     
     // DNS K-means clustering on flow bytes
     //kmeansBytes(HogRDD)
     
     // DNS Super Bag
-    superbag(HogRDD)
+    //superbag(HogRDD,spark)
     
     // DNS K-means clustering
-    kmeans(HogRDD)
+   kmeans(HogRDD)
  
   }
   
@@ -140,7 +144,7 @@ object HogDNS {
     
     val data = labelAndData.values.cache()
     val kmeans = new KMeans()
-    kmeans.setK(10)
+    kmeans.setK(9)
     val model = kmeans.run(data)
     
      val clusterLabel = labelAndData.map({
@@ -189,14 +193,14 @@ object HogDNS {
       }
 
 
-      val dirty = clusterLabelCount.keySet().toArray().filter({ case (cluster:Int,label:String) => cluster.>(0) }).
+      val tainted = clusterLabelCount.keySet().toArray().filter({ case (cluster:Int,label:String) => cluster.>(0) }).
                   sortBy ({ case (cluster:Int,label:String) => clusterLabelCount.get((cluster,label))._1.toDouble }).reverse.apply(0)
       
                   
       println("######################################################################################")
-      println("Dirty flows of: "+dirty.toString())
+      println("Tainted flows of: "+tainted.toString())
       
-      clusterLabel.filter({ case (cluster,(group,taited,hostname,flow),datum) => (cluster,group).equals(dirty) }).
+      clusterLabel.filter({ case (cluster,(group,taited,hostname,flow),datum) => (cluster,group).equals(tainted) }).
       foreach{ case (cluster,(group,taited,hostname,flow),datum) => 
         val event = new HogEvent(flow)
         event.data.put("centroids", centroids)
@@ -318,12 +322,6 @@ object HogDNS {
 
   }
   
-<<<<<<< HEAD
-    
-=======
-  
-  
->>>>>>> e4d5138ef1f85f7691781eef3bdee1464b833b60
   
   
   /**
@@ -331,34 +329,47 @@ object HogDNS {
    * 
    * 
    */
-  def superbag(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)])
+  def superbag(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)],spark:SparkContext)
   {
-<<<<<<< HEAD
-    class flowSet(flowc:Map[String,String])
+
+    class flowSet(flowc:Map[String,String]) extends Serializable
     {
-      val flows=new HashMap[(String,String,String),(HashSet[Map[String,String]],HashMap[String,Double])] // (flow:lip,flow:uip,flow:host) -> (Set[flows],Info)
+      val flows=new HashMap[(String,String,String),(HashSet[Map[String,String]],HashMap[String,Double],LabeledPoint)]
+      // (flow:lip,flow:uip,flow:host) -> (Set[flows],Info,LabeledPoint)
       
       add(flowc)
-=======
-    class flowSet()
-    {
-      //val flows=new HashMap[(String,String),Array[Map[String,String]]]
->>>>>>> e4d5138ef1f85f7691781eef3bdee1464b833b60
- 
-      def add(flow:Map[String,String])
+
+       def add(flow:Map[String,String]) 
       {
         // Add flow in the Set
-<<<<<<< HEAD
-        val value = flows.get((flow.get("flow:lower_ip"),flow.get("flow:upper_ip"),flow.get("flow:host_server_name")))
-        value._1.add(flow) 
-        //value._2.put("qtd",1)
-        //value._2.put("avg",x)
+        val value = flows.get((flow.get("flow:lower_name"),flow.get("flow:upper_name"),flow.get("flow:host_server_name")))
+        
+        if(value == null)
+        {
+          val a = new HashSet[Map[String,String]]
+          val b = new HashMap[String,Double]
+          a.add(flow)
+          flows.put((flow.get("flow:lower_name"),flow.get("flow:upper_name"),flow.get("flow:host_server_name")), (a,b,new LabeledPoint(0,Vectors.dense(0))))
+        }else
+        {
+          value._1.add(flow)
+        }
       } 
       
       def merge(flowset:flowSet):flowSet =
       {
-        val iter = flowset.flows.keySet().toArray().map({ key => 
-                      this.flows.get(key)._1.addAll(flowset.flows.get(key)._1)
+        val iter = flowset.flows.keySet().toArray().map({ case key:(String,String,String) => 
+                      val value = this.flows.get(key)
+                      if( value == null)
+                      {
+                           val a = new HashSet[Map[String,String]]
+                           val b = new HashMap[String,Double]
+                           a.addAll(flowset.flows.get(key)._1)
+                           this.flows.put(key, (a,b,new LabeledPoint(0,Vectors.dense(0)) ))
+                      }else
+                      {
+                        this.flows.get(key)._1.addAll(flowset.flows.get(key)._1)
+                      }
                    })
           this
           /*
@@ -376,8 +387,6 @@ object HogDNS {
     }
     
     // Populate flowSet
-   //val flowset = new flowSet()
-    
     val DnsRDD = HogRDD.
         map { case (id,result) => {
           val map: Map[String,String] = new HashMap[String,String]
@@ -400,31 +409,105 @@ object HogDNS {
     val superBag = DnsRDD.map({flow => new flowSet(flow) }).reduce((a,b) => a.merge(b)) 
     
     // compute sizes, inter times, means and stddevs
-    superBag.flows.keySet().toArray().map({ key =>  superBag.flows.get(key)}).map({case (flowSet1:HashSet[Map[String,String]],info:HashMap[String,Double]) => 
-        //flowSet1.toArray().map(case ).sortBy { f => f }
-        //sortBy({ flow => flow.get("").toDouble })  
+    val labeledpoints:HashSet[LabeledPoint] = new HashSet()
+    superBag.flows.keySet().toArray().map({ key =>  superBag.flows.get(key)}).map({case (flowSet1:HashSet[Map[String,String]],info:HashMap[String,Double],labeledpoint:LabeledPoint) => 
+      
+        if(flowSet1.size()>4)
+        {
+      
+        val flowSetOrdered = flowSet1.toArray().toSeq.map({  case f:Map[String,String] => f }).sortBy(f => f.get("flow:first_seen").toDouble).toArray
+                
+        val timeArray:Array[Double] = Array.fill[Double](flowSetOrdered.length)(0)
+        var dirty:Double =0;
+        var clean:Double =0;
+        
+        (0 to (flowSetOrdered.length-2)).map({ k => 
+             timeArray.update(k, flowSetOrdered(k+1).get("flow:first_seen").toDouble - flowSetOrdered(k).get("flow:first_seen").toDouble)
+             
+             
+             if (flowSetOrdered(k).get("event:priority_id")!=null)
+             {
+               //println(flowSetOrdered(k).get("event:priority_id"))
+                dirty=1;
+             }
+             
+             
+             if (flowSetOrdered(k).get("flow:detected_protocol").ne("5/DNS"))
+             {
+                clean=1;
+             }
+        })
+        
+        if(dirty==1 || clean==1)
+        {
+          val count = timeArray.length
+          val avg = timeArray.sum/count
+          val devs = timeArray.toSeq.map { t => (t-avg)*(t-avg) }
+          val stddev = Math.sqrt(devs.sum/count)
+        
+          info.put("flow_intertime_avg", avg)
+          info.put("flow_intertime_stddev", stddev)
+          info.put("flow_intertime_count", count)
+          
+          if(dirty==1)
+          {
+            println(LabeledPoint(1,Vectors.dense(count,avg,stddev)).toString)
+            //labeledpoints.add(LabeledPoint(1,Vectors.dense(count,avg,stddev)))
+            info.put("dirty", 1)
+            labeledpoints.add(LabeledPoint(1,Vectors.dense(stddev)))
+          }else{
+            println(LabeledPoint(0,Vectors.dense(count,avg,stddev)).toString)
+            info.put("dirty", 0)
+            //labeledpoints.add(LabeledPoint(0,Vectors.dense(count,avg,stddev)))
+            labeledpoints.add(LabeledPoint(0,Vectors.dense(stddev)))
+          }
+        }
+        
+        }
     })
-    
-    
+  
+    val arraylabeledpoints = labeledpoints.toArray().map({ case xy:LabeledPoint => xy })
+   
     // SVM considering dirty flows from Snort
     
+    val svmAlg = new SVMWithSGD()
+    svmAlg.optimizer.setNumIterations(200).setRegParam(0.1).setUpdater(new L1Updater)
+    
+    val model = svmAlg.run(spark.parallelize(arraylabeledpoints).cache)
+    
+    model.clearThreshold()
+    
+   println("######################################################################################")           
+   
+   println("Model.intercept: "+model.intercept+" Model.weights: "+model.weights)
+   
+    superBag.flows.keySet().toArray().map({ case key:(String,String,String) =>  
+    
+        if(superBag.flows.get(key)._1.size()>4)
+        {
+      
+      val info = superBag.flows.get(key)._2
+      
+     // val score = model.predict(Vectors.dense(info.get("flow_intertime_count"),info.get("flow_intertime_avg"),info.get("flow_intertime_stddev")) )
+      val score = model.predict(Vectors.dense(info.get("flow_intertime_stddev")) )
+    // print(score+"|")
+     
+     if(info.get("flow_intertime_avg")<100000 && info.get("dirty")!=null)
+     println("USED: "+key._1+" <-> "+key._2+", hostname: "+key._3+" ("+info.get("flow_intertime_count").toString+","+info.get("flow_intertime_avg").toString+","+info.get("flow_intertime_stddev").toString+")")
+            
+     if(score>0)
+     {
+     //  println("Tainted flow: "+key._1+" <-> "+key._2+", hostname: "+key._3+"")
+       println("Tainted flow: "+key._1+" <-> "+key._2+", hostname: "+key._3+" ("+info.get("flow_intertime_count").toString+","+info.get("flow_intertime_avg").toString+","+info.get("flow_intertime_stddev").toString+")")
+     }
+        }
+     })
+     
+    println("######################################################################################")           
+ 
     // Taint the dirty side, generating HogEvents
-    
-=======
-       // if(flows.get((flow.get(""),flow.get(""))).isEmpty )
-         // flows.put((flow.get(""),flow.get("")),new HashMap[String,String])
-         // flows.get((flow.get(""),flow.get(""))).xxx(flow)
-       }
-    }
-    
-    // Populate flowSet
-    
-    // Order and compute sizes, inter times, means and stddevs
+    /* */
 
-    // SVM considering dirty flows from Snort
-    
-    // Taint the dirty side, generating HogEvents
->>>>>>> e4d5138ef1f85f7691781eef3bdee1464b833b60
   }
   
 }
