@@ -33,3 +33,6 @@ scan 'hogzilla_flows', {
 FILTER => "(SingleColumnValueFilter('flow','lower_port',=,'regexstring:53',true,true)) AND (SingleColumnValueFilter('flow','host_server_name',=,'regexstring:msnsolution.nicaze.net',true,true))",
 LIMIT => 1}
 
+scan 'hogzilla_flows', {
+FILTER => "(SingleColumnValueFilter('flow','lower_port',=,'regexstring:53',true,true)) AND (SingleColumnValueFilter('flow','detected_protocol',=,'regexstring:.*5/DNS.*',true,true))",
+LIMIT => 1}
