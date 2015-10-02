@@ -1,3 +1,28 @@
+/*
+* Copyright (C) 2015-2015 Paulo Angelo Alves Resende <pa@pauloangelo.com>
+*
+* This program is free software; you can redistribute it and/or modify
+* it under the terms of the GNU General Public License Version 2 as
+* published by the Free Software Foundation.  You may not use, modify or
+* distribute this program under any other version of the GNU General
+* Public License.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software
+* Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+*/
+/** 
+ *  REFERENCES:
+ *   - http://www.zytrax.com/books/dns/ch15/
+ *   - http://ids-hogzilla.org/xxx/826000001
+ */
+
+
 package org.hogzilla.dns
 
 import java.util.HashMap
@@ -10,7 +35,7 @@ import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.linalg.Vector
 import org.apache.spark.rdd.RDD
 import org.hogzilla.hbase.HogHBaseRDD
-import org.hogzilla.event.HogEvent
+import org.hogzilla.event.{HogEvent, HogSignature}
 import java.util.HashSet
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.mllib.classification.SVMWithSGD
@@ -19,10 +44,11 @@ import org.apache.spark.mllib.optimization.L1Updater
 
 /**
  * 
-References: http://www.zytrax.com/books/dns/ch15/
  */
 object HogDNS {
 
+  val signature = new HogSignature(3,"HZ: Suspicious DNS flow identified by K-Means clustering",2,1,826000001,826)
+  
   /**
    * 
    * 
@@ -227,101 +253,6 @@ object HogDNS {
 
 
   }
-  
-  
-  
-  /**
-   * 
-   * 
-   * 
-   */
-  def kmeansBytes(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)])
-  {
- 
-     
-	  val DnsRDD = HogRDD.
-			  map { case (id,result) => {
-				  val map: Map[String,String] = new HashMap[String,String]
-						  map.put("flow:id",Bytes.toString(id.get).toString())
-						  HogHBaseRDD.columns.foreach { column => map.put(column, 
-								  Bytes.toString(result.getValue(Bytes.toBytes(column.split(":")(0).toString()),Bytes.toBytes(column.split(":")(1).toString())))) 
-			  }
-			  map
-			  }
-	  }
-
-   
-	  val labelAndData = DnsRDD.filter(_.get("flow:lower_port").equals("53")).map { flow => 
-	  
-    /*val vector = Vectors.dense(flow.get("flow:avg_packet_size").toDouble,flow.get("flow:bytes").toDouble)
-	  ((flow.get("flow:detected_protocol"),flow.get("flow:bytes")),vector)
-	 // (flow.get("flow:id"),vector)
-	  } */
-    
-     val vector = Vectors.dense(flow.get("flow:bytes").toDouble)
-    ((flow.get("flow:detected_protocol"),flow.get("flow:bytes")),vector)
-   // (flow.get("flow:id"),vector)
-    }
-    
-    val data = labelAndData.values.cache()
-    val kmeans = new KMeans()
-    val model = kmeans.run(data)
-    
-    val clusterLabelCount = labelAndData.map({
-      case (label,datum) =>
-        val cluster = model.predict(datum)
-        val map: Map[(Int,String),(Double,Int)] = new HashMap[(Int,String),(Double,Int)]
-        map.put((cluster,label._1),  (label._2.toDouble,1))
-        map
-    }).reduce((a,b) => { 
-      b.keySet().toArray()
-      .map { 
-        case key: (Int,String) =>  
-            if (a.containsKey(key))
-            {
-              val avg = (a.get(key)._1*a.get(key)._2 + b.get(key)._1*b.get(key)._2)/
-                          (a.get(key)._2+b.get(key)._2)
-                          
-              a.put(key, (avg,a.get(key)._2+b.get(key)._2))
-            }else
-              a.put(key,b.get(key))
-      }
-      a
-    })
-    
-    //.countByValue
-    
-    println("######################################################################################")
-    println("DNS K-Means Clustering by Flow Total Bytes")
-    println("Centroids")
-    model.clusterCenters.foreach { println }
-    
-    clusterLabelCount.keySet().toArray().foreach { case key:(Int,String) =>  
-      val cluster = key._1
-      val label = key._2
-      val count =clusterLabelCount.get(key)._2.toString
-      val avg = clusterLabelCount.get(key)._1.toString
-      println(f"Cluster: $cluster%1s\t\tLabel: $label%20s\t\tCount: $count%10s\t\tAvg: $avg%10s")
-      }
-
-    /*clusterLabelCount.toSeq.sorted.foreach {
-     
-      case ((cluster,label),count) =>
-        println(f"Cluster: $cluster%1sLabel: $label%18s Count: $count%8s")
-    }*/
-    
-    //val max = hBaseRDD.map(tuple => tuple._2)
-    //          .map(result => Bytes.toString(result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("packets"))).toLong)
-    //          .reduce((a,b) => Math.max(a,b))
-              
-    //println("Maximo: "+teste)
-  //  teste.toSeq.sortBy(_._2).foreach(println)
-    //teste.foreach(println)
-    println("######################################################################################")           
-
-
-  }
-  
   
   
   /**
