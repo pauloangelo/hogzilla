@@ -27,6 +27,8 @@ object HogHBaseRDD {
 
   val hogzilla_flows = new HTable(conf,"hogzilla_flows")
   val hogzilla_events = new HTable(conf,"hogzilla_events")
+  val hogzilla_sensor = new HTable(conf,"hogzilla_sensor")
+  val hogzilla_signatures = new HTable(conf,"hogzilla_signatures")
 
   
   def connect(spark: SparkContext):RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)]=

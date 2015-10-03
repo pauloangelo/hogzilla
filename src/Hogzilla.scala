@@ -1,5 +1,3 @@
-
-
 /**
  * 
  * 
@@ -20,6 +18,7 @@ import org.apache.spark.mllib.linalg.Vectors
 import org.hogzilla.hbase._
 import org.hogzilla.dns.HogDNS
 import org.hogzilla.prepare._
+import org.hogzilla.initiate.HogInitiate
 
 /**
  * 
@@ -36,6 +35,9 @@ object Hogzilla {
     
     // Get the HBase RDD
     val HogRDD = HogHBaseRDD.connect(spark);
+    
+    // Initiate HogZilla
+    HogInitiate.initiate(spark);
     
     // Prepare the data
     //HogPrepare.prepare(HogRDD)

@@ -13,7 +13,12 @@ object HogPrepare {
   
   def prepare(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)])
   {
+    
+    
  
+    /*
+   
+     //THIS CODE HAS BUGS
    
     // TODO HZ: Update flow:inter_time_stddev and flow:packet_size_stddev using "flow:inter_time-%d","flow:packet_size-%d"
    
@@ -47,7 +52,7 @@ object HogPrepare {
         mutation.add(put)
         HogHBaseRDD.hogzilla_flows.mutateRow(mutation)
     })
-   
+   */
 
   }
   

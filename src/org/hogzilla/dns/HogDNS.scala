@@ -47,7 +47,8 @@ import org.apache.spark.mllib.optimization.L1Updater
  */
 object HogDNS {
 
-  val signature = new HogSignature(3,"HZ: Suspicious DNS flow identified by K-Means clustering",2,1,826000001,826)
+  val signature = (HogSignature(3,"HZ: Suspicious DNS flow identified by K-Means clustering",2,1,826000001,826).saveHBase(),
+                   HogSignature(3,"HZ: Suspicious DNS flow identified by SuperBag",2,1,826000002,826).saveHBase())
   
   /**
    * 
@@ -74,7 +75,7 @@ object HogDNS {
    * 
    * 
    */
-  def populate(event:HogEvent):HogEvent =
+  def kmeansPopulate(event:HogEvent):HogEvent =
   {
     val centroids:String = event.data.get("centroids")
     val vector:String = event.data.get("vector")
@@ -84,10 +85,14 @@ object HogDNS {
     event.text = "This flow was detected by Hogzilla as an anormal activity.\n"+
                  ""+hostname+"\n"+
                  "Event details:\n"+
-                 "Hogzilla module: HogDNS, Method: k-means clustering with k=10\n"+
+                 "Hogzilla module: HogDNS, Method: k-means clustering with k=9\n"+
                  "Centroids:"+centroids+"\n"
                  "Vector: "+vector+"\n"
                  "(cluster,label nDPI): "+clusterLabel+"\n"
+    
+    event.lower_ip = event.data.get("lower_ip")             
+    event.upper_ip = event.data.get("upper_ip")
+    event.signature_id = signature._1.signature_id
                  
     event
   }
@@ -233,7 +238,9 @@ object HogDNS {
         event.data.put("vector", datum.toString)
         event.data.put("clusterLabel", "("+cluster.toString()+","+group+")")
         event.data.put("hostname", flow.get("flow:host_server_name"))
-        populate(event).alert()
+        event.data.put("lower_ip", flow.get("flow:lower_ip"))
+        event.data.put("upper_ip", flow.get("flow:upper_ip"))
+        kmeansPopulate(event).alert()
       }
 
       
