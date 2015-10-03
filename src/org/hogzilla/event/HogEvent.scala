@@ -12,9 +12,7 @@ import org.apache.hadoop.hbase.client.Put
 class HogEvent(flow:Map[String,String]) 
 {
 	var sensorid:Int=0
-	//var eventsecond:Int=0
 	var signature_id:Double=0
-	//var generatorid:Int=0
 	var priorityid:Int=0
   var lower_ip:String=""
   var upper_ip:String=""
@@ -30,6 +28,7 @@ class HogEvent(flow:Map[String,String])
      put.add(Bytes.toBytes("event"), Bytes.toBytes("signature_id"), Bytes.toBytes("%.0f".format(signature_id)))
      HogHBaseRDD.hogzilla_events.put(put)
 
+     //println(f"ALERT: $text%100s\n\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
    }
 }
 

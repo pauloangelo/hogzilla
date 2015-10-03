@@ -49,6 +49,9 @@ object HogDNS {
 
   val signature = (HogSignature(3,"HZ: Suspicious DNS flow identified by K-Means clustering",2,1,826000001,826).saveHBase(),
                    HogSignature(3,"HZ: Suspicious DNS flow identified by SuperBag",2,1,826000002,826).saveHBase())
+                   
+  val numberOfClusters=9
+  val maxAnomalousClusterProportion=0.05
   
   /**
    * 
@@ -82,12 +85,13 @@ object HogDNS {
     val clusterLabel:String = event.data.get("clusterLabel")
     val hostname:String = event.data.get("hostname")
     
-    event.text = "This flow was detected by Hogzilla as an anormal activity.\n"+
-                 ""+hostname+"\n"+
-                 "Event details:\n"+
-                 "Hogzilla module: HogDNS, Method: k-means clustering with k=9\n"+
-                 "Centroids:"+centroids+"\n"
-                 "Vector: "+vector+"\n"
+    
+    event.text = "This flow was detected by Hogzilla as an anormal activity.In what follows you can see more information.\n"+
+                 "Hostname mentioned in DNS flow: "+hostname+"\n"+
+                 "Hogzilla module: HogDNS, Method: k-means clustering with k="+numberOfClusters+"\n"+
+                 "URL for more information: http://ids-hogzilla.org/signature-db/"+"%.0f".format(signature._1.signature_id)+"\n"+
+                 "Centroids:\n"+centroids+"\n"+
+                 "Vector: "+vector+"\n"+
                  "(cluster,label nDPI): "+clusterLabel+"\n"
     
     event.lower_ip = event.data.get("lower_ip")             
@@ -142,7 +146,9 @@ object HogDNS {
         map
         }
     }.filter(x => x.get("flow:lower_port").equals("53") && x.get("flow:packets").toDouble.>(1)).cache
-      
+  
+    val RDDtotalSize= DnsRDD.count()
+    
   val DnsRDDcount = DnsRDD.map(flow => features.map { feature => flow.get(feature).toDouble }).cache()
   
   val numCols = DnsRDDcount.first.length
@@ -175,7 +181,7 @@ object HogDNS {
     
     val data = labelAndData.values.cache()
     val kmeans = new KMeans()
-    kmeans.setK(9)
+    kmeans.setK(numberOfClusters)
     val model = kmeans.run(data)
     
      val clusterLabel = labelAndData.map({
@@ -212,8 +218,8 @@ object HogDNS {
     println("######################################################################################")
     println("DNS K-Means Clustering")
     println("Centroids")
-    val centroids = ""
-    model.clusterCenters.foreach { center => centroids.concat("\n"+center.toString) }
+    val centroids = ""+model.clusterCenters.mkString(",\n")
+    //model.clusterCenters.foreach { center => centroids.concat("\n"+center.toString) }
     
     clusterLabelCount.keySet().toArray().foreach { case key:(Int,String) =>  
       val cluster = key._1
@@ -223,16 +229,20 @@ object HogDNS {
       println(f"Cluster: $cluster%1s\t\tLabel: $label%20s\t\tCount: $count%10s\t\tAvg: $avg%10s")
       }
 
-
-      val tainted = clusterLabelCount.keySet().toArray().filter({ case (cluster:Int,label:String) => cluster.>(0) }).
+      val thr=maxAnomalousClusterProportion*RDDtotalSize
+      
+      val tainted = clusterLabelCount.keySet().toArray().filter({ case (cluster:Int,label:String) => 
+                         cluster.>(0) &&
+                         ((clusterLabelCount.get((cluster,label))._2.toDouble) < thr)
+                     }).
                   sortBy ({ case (cluster:Int,label:String) => clusterLabelCount.get((cluster,label))._1.toDouble }).reverse.apply(0)
       
                   
       println("######################################################################################")
       println("Tainted flows of: "+tainted.toString())
       
-      clusterLabel.filter({ case (cluster,(group,taited,hostname,flow),datum) => (cluster,group).equals(tainted) }).
-      foreach{ case (cluster,(group,taited,hostname,flow),datum) => 
+      clusterLabel.filter({ case (cluster,(group,tagged,hostname,flow),datum) => (cluster,group).equals(tainted) && tagged.equals(0) }).
+      foreach{ case (cluster,(group,tagged,hostname,flow),datum) => 
         val event = new HogEvent(flow)
         event.data.put("centroids", centroids)
         event.data.put("vector", datum.toString)
@@ -247,7 +257,7 @@ object HogDNS {
    (1 to 9).map{ k => 
       println("######################################################################################")
       println(f"Hosts from cluster $k%1s")
-     clusterLabel.filter(_._1.equals(k)).foreach{ case (cluster,label,datum) => 
+      clusterLabel.filter(_._1.equals(k)).foreach{ case (cluster,label,datum) => 
         print(label._3+"|")      
       }
       println("")
