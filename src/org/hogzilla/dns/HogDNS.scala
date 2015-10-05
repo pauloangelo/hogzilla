@@ -231,43 +231,52 @@ object HogDNS {
 
       val thr=maxAnomalousClusterProportion*RDDtotalSize
       
-      val tainted = clusterLabelCount.keySet().toArray().filter({ case (cluster:Int,label:String) => 
+      val taintedArray = clusterLabelCount.keySet().toArray().filter({ case (cluster:Int,label:String) => 
                          cluster.>(0) &&
-                         ((clusterLabelCount.get((cluster,label))._2.toDouble) < thr)
+                         ((clusterLabelCount.get((cluster,label))._2.toDouble) < thr) &&
+                         clusterLabelCount.get((cluster,label))._1.toDouble > 0
                      }).
-                  sortBy ({ case (cluster:Int,label:String) => clusterLabelCount.get((cluster,label))._1.toDouble }).reverse.apply(0)
+                  sortBy ({ case (cluster:Int,label:String) => clusterLabelCount.get((cluster,label))._1.toDouble }).reverse
       
+      if(taintedArray.length >0)
+      {
+        
+        val tainted = taintedArray.apply(0)
                   
-      println("######################################################################################")
-      println("Tainted flows of: "+tainted.toString())
+        println("######################################################################################")
+        println("Tainted flows of: "+tainted.toString())
       
-      clusterLabel.filter({ case (cluster,(group,tagged,hostname,flow),datum) => (cluster,group).equals(tainted) && tagged.equals(0) }).
-      foreach{ case (cluster,(group,tagged,hostname,flow),datum) => 
-        val event = new HogEvent(flow)
-        event.data.put("centroids", centroids)
-        event.data.put("vector", datum.toString)
-        event.data.put("clusterLabel", "("+cluster.toString()+","+group+")")
-        event.data.put("hostname", flow.get("flow:host_server_name"))
-        event.data.put("lower_ip", flow.get("flow:lower_ip"))
-        event.data.put("upper_ip", flow.get("flow:upper_ip"))
-        kmeansPopulate(event).alert()
-      }
+        clusterLabel.filter({ case (cluster,(group,tagged,hostname,flow),datum) => (cluster,group).equals(tainted) && tagged.equals(0) }).
+        foreach{ case (cluster,(group,tagged,hostname,flow),datum) => 
+          val event = new HogEvent(flow)
+          event.data.put("centroids", centroids)
+          event.data.put("vector", datum.toString)
+          event.data.put("clusterLabel", "("+cluster.toString()+","+group+")")
+          event.data.put("hostname", flow.get("flow:host_server_name"))
+          event.data.put("lower_ip", flow.get("flow:lower_ip"))
+          event.data.put("upper_ip", flow.get("flow:upper_ip"))
+          kmeansPopulate(event).alert()
+        }
 
       
-   (1 to 9).map{ k => 
+     (1 to 9).map{ k => 
+        println("######################################################################################")
+        println(f"Hosts from cluster $k%1s")
+        clusterLabel.filter(_._1.equals(k)).foreach{ case (cluster,label,datum) => 
+          print(label._3+"|")      
+        }
+        println("")
+     }
+
       println("######################################################################################")
-      println(f"Hosts from cluster $k%1s")
-      clusterLabel.filter(_._1.equals(k)).foreach{ case (cluster,label,datum) => 
-        print(label._3+"|")      
-      }
-      println("")
+      println("######################################################################################")
+      println("######################################################################################")
+      println("######################################################################################")           
+
+   }else
+   {
+        println("No flow matched!")
    }
-
-    println("######################################################################################")
-    println("######################################################################################")
-    println("######################################################################################")
-    println("######################################################################################")           
-
 
   }
   
