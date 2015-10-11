@@ -19,10 +19,11 @@ import org.hogzilla.hbase._
 import org.hogzilla.dns.HogDNS
 import org.hogzilla.prepare._
 import org.hogzilla.initiate.HogInitiate
+import org.hogzilla.http.HogHTTP
 
 /**
  * 
- * Keep it simple, robust, scalable and useful.
+ * Keep it useful, simple, robust, and scalable.
  * 
  * 
  */
@@ -40,13 +41,13 @@ object Hogzilla {
     HogInitiate.initiate(spark);
     
     // Prepare the data
-    //HogPrepare.prepare(HogRDD)
+    HogPrepare.prepare(HogRDD)
     
     // Run algorithms for DNS protocol
     HogDNS.run(HogRDD,spark);
     
     // Run algorithms for HTTP protocol
-    //HogHTTP.run(HogRDD);
+    HogHTTP.run(HogRDD,spark);
     
     // Run algorithms for SMTP protocol
     //HogSMTP.run(HogRDD);

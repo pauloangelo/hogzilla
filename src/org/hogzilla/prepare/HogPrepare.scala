@@ -7,6 +7,8 @@ import org.apache.spark.rdd.RDD
 import org.hogzilla.hbase.HogHBaseRDD
 import org.apache.hadoop.hbase.client.RowMutations
 import org.apache.hadoop.hbase.client.Put
+import org.apache.hadoop.hbase.client.Delete
+import org.apache.hadoop.hbase.client.Scan
 
 
 object HogPrepare {
@@ -14,10 +16,42 @@ object HogPrepare {
   def prepare(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)])
   {
     
+    // Delete old data from HBase 86400 is one day. You should need even more, depends on your available resources.
+    
+    println("Cleaning HBase...")
+    val timeSuperior = System.currentTimeMillis - 86400000
+    val nSplits = 10
+    val denseTime = 86400000*2
+    val deltaT = denseTime/nSplits
+ 
+    // Parallel
+    (0 to nSplits).toList.par.map{ k => 
+       
+      val scan = new Scan
+      
+      if(k.equals(0))
+        scan.setTimeRange(0, timeSuperior-denseTime)
+      else
+        scan.setTimeRange(timeSuperior-denseTime + deltaT*(k-1), timeSuperior-denseTime + deltaT*k)
+        
+      println("TimeRange: "+scan.getTimeRange.toString())  
+    
+      val scanner = HogHBaseRDD.hogzilla_flows.getScanner(scan).iterator()
+    
+      while(scanner.hasNext())
+      {
+        HogHBaseRDD.hogzilla_flows.delete(new Delete(scanner.next().getRow))
+      }
+    }
+    
     
  
     /*
    
+   
+     //scan.setStartRow(Bytes.toBytes("0"))
+      //scan.setStopRow(Bytes.toBytes(time))
+       * 
      //THIS CODE HAS BUGS
    
     // TODO HZ: Update flow:inter_time_stddev and flow:packet_size_stddev using "flow:inter_time-%d","flow:packet_size-%d"

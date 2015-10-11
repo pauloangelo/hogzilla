@@ -36,3 +36,5 @@ LIMIT => 1}
 scan 'hogzilla_flows', {
 FILTER => "(SingleColumnValueFilter('flow','lower_port',=,'regexstring:53',true,true)) AND (SingleColumnValueFilter('flow','detected_protocol',=,'regexstring:.*5/DNS.*',true,true))",
 LIMIT => 1}
+
+scan 'hogzilla_flows',{LIMIT => 10, FILTER => "(SingleColumnValueFilter('flow','upper_port',=,'regexstring:80',true,true) OR  SingleColumnValueFilter('flow','lower_port',=,'regexstring:80',true,true)) AND (SingleColumnValueFilter('flow','upper_name',=,'regexstring:189.9.39.12',true,true) OR SingleColumnValueFilter('flow','lower_name',=,'regexstring:189.9.39.12',true,true)) AND SingleColumnValueFilter('event','priority',=,'regexstring:1',true,true)" }

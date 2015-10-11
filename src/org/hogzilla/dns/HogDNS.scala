@@ -41,6 +41,7 @@ import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.mllib.classification.SVMWithSGD
 import scala.tools.nsc.doc.base.comment.OrderedList
 import org.apache.spark.mllib.optimization.L1Updater
+import org.hogzilla.util.HogFlow
 
 /**
  * 
@@ -52,6 +53,7 @@ object HogDNS {
                    
   val numberOfClusters=9
   val maxAnomalousClusterProportion=0.05
+  val minDirtyProportion=0.001
   
   /**
    * 
@@ -86,7 +88,7 @@ object HogDNS {
     val hostname:String = event.data.get("hostname")
     
     
-    event.text = "This flow was detected by Hogzilla as an anormal activity.In what follows you can see more information.\n"+
+    event.text = "This flow was detected by Hogzilla as an anormal activity. In what follows you can see more information.\n"+
                  "Hostname mentioned in DNS flow: "+hostname+"\n"+
                  "Hogzilla module: HogDNS, Method: k-means clustering with k="+numberOfClusters+"\n"+
                  "URL for more information: http://ids-hogzilla.org/signature-db/"+"%.0f".format(signature._1.signature_id)+"\n"+
@@ -94,8 +96,6 @@ object HogDNS {
                  "Vector: "+vector+"\n"+
                  "(cluster,label nDPI): "+clusterLabel+"\n"
     
-    event.lower_ip = event.data.get("lower_ip")             
-    event.upper_ip = event.data.get("upper_ip")
     event.signature_id = signature._1.signature_id
                  
     event
@@ -143,9 +143,12 @@ object HogDNS {
           if(map.get("flow:dns_bad_packet")==null) map.put("flow:dns_bad_packet","0")
           if(map.get("flow:dns_query_type")==null) map.put("flow:dns_query_type","0")
           if(map.get("flow:dns_rsp_type")==null) map.put("flow:dns_rsp_type","0")
-        map
+          
+          val lower_ip = result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("lower_ip"))
+          val upper_ip = result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("upper_ip"))
+          new HogFlow(map,lower_ip,upper_ip)
         }
-    }.filter(x => x.get("flow:lower_port").equals("53") && x.get("flow:packets").toDouble.>(1)).cache
+    }.filter(x =>  ( x.get("flow:lower_port").equals("53") || x.get("flow:upper_port").equals("53")) && x.get("flow:packets").toDouble.>(1)).cache
 
   println("Counting HogRDD...")
   val RDDtotalSize= DnsRDD.count()
@@ -239,9 +242,8 @@ object HogDNS {
       
       println("Selecting cluster to be tainted...")
       val taintedArray = clusterLabelCount.keySet().toArray().filter({ case (cluster:Int,label:String) => 
-                         cluster.>(0) &&
                          ((clusterLabelCount.get((cluster,label))._2.toDouble) < thr) &&
-                         clusterLabelCount.get((cluster,label))._1.toDouble > 0
+                         clusterLabelCount.get((cluster,label))._1.toDouble >= minDirtyProportion
                      }).
                   sortBy ({ case (cluster:Int,label:String) => clusterLabelCount.get((cluster,label))._1.toDouble }).reverse
       
@@ -261,8 +263,6 @@ object HogDNS {
           event.data.put("vector", datum.toString)
           event.data.put("clusterLabel", "("+cluster.toString()+","+group+")")
           event.data.put("hostname", flow.get("flow:host_server_name"))
-          event.data.put("lower_ip", flow.get("flow:lower_ip"))
-          event.data.put("upper_ip", flow.get("flow:upper_ip"))
           kmeansPopulate(event).alert()
         }
 
