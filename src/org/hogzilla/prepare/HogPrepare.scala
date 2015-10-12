@@ -1,3 +1,22 @@
+/*
+* Copyright (C) 2015-2015 Paulo Angelo Alves Resende <pa@pauloangelo.com>
+*
+* This program is free software; you can redistribute it and/or modify
+* it under the terms of the GNU General Public License Version 2 as
+* published by the Free Software Foundation.  You may not use, modify or
+* distribute this program under any other version of the GNU General
+* Public License.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program; if not, write to the Free Software
+* Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
+*/
+
 package org.hogzilla.prepare
 
 import java.util.HashMap
@@ -9,6 +28,11 @@ import org.apache.hadoop.hbase.client.RowMutations
 import org.apache.hadoop.hbase.client.Put
 import org.apache.hadoop.hbase.client.Delete
 import org.apache.hadoop.hbase.client.Scan
+import org.apache.hadoop.hbase.filter.Filter
+import org.apache.hadoop.hbase.filter.SingleColumnValueFilter
+import org.apache.hadoop.hbase.filter.BinaryComparator
+import org.apache.hadoop.hbase.filter.CompareFilter.CompareOp
+import org.apache.hadoop.hbase.filter.CompareFilter
 
 
 object HogPrepare {
@@ -16,24 +40,51 @@ object HogPrepare {
   def prepare(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)])
   {
     
+ /**
+  * This is an illustration of the purge process in a fancy time-line.
+  * 
+  * 
+  *        Sup1-denseTime       tSup1                         tSup2                          now
+  *  old flows   |  dense period  |    training dirty period    |       don't touch           |      future    
+  * ------------------------------------------------------------------------------------------------------------->
+  *  remove all     remove all        Remove flows w/o events
+  *                   in par           priority_id=1 in par
+  *            
+  *  You can change this, but the time below are reasonable
+  *                   
+  *  tSup2     = now - timeUnit    
+  *  tSup1     = now - 10*timeUnit
+  *  denseTime = 2*timeUnit
+  *  
+  *  24h = 86400000
+  *  12h = 43200000
+  *  06h = 21600000         
+  */
+    
     // Delete old data from HBase 86400 is one day. You should need even more, depends on your available resources.
     
     println("Cleaning HBase...")
-    val timeSuperior = System.currentTimeMillis - 86400000
-    val nSplits = 10
-    val denseTime = 86400000*2
-    val deltaT = denseTime/nSplits
+    val now = System.currentTimeMillis
+    
+    val timeUnit = 21600000 /* maybe one day (86400000) or half (43200000) */
+    val timeSuperior1 = now - timeUnit*10
+    val timeSuperior2 = now - timeUnit
+    val nSplits = 4 /* number of parallel tasks */
+    val denseTime = timeUnit*4
+    val deltaT1 = denseTime/nSplits
+    val deltaT2 = (timeSuperior2-timeSuperior1)/nSplits
  
-    // Parallel
+    println("Removing all older than "+timeSuperior1)
     (0 to nSplits).toList.par.map{ k => 
        
       val scan = new Scan
       
       if(k.equals(0))
-        scan.setTimeRange(0, timeSuperior-denseTime)
+        scan.setTimeRange(0, timeSuperior1-denseTime)
       else
-        scan.setTimeRange(timeSuperior-denseTime + deltaT*(k-1), timeSuperior-denseTime + deltaT*k)
+        scan.setTimeRange(timeSuperior1-denseTime + deltaT1*(k-1), timeSuperior1-denseTime + deltaT1*k)
         
+      
       println("TimeRange: "+scan.getTimeRange.toString())  
     
       val scanner = HogHBaseRDD.hogzilla_flows.getScanner(scan).iterator()
@@ -44,8 +95,30 @@ object HogPrepare {
       }
     }
     
+    println("Removing flows w/o events priority 1, which are between "+timeSuperior1+" and "+timeSuperior2)
+    (1 to nSplits).toList.par.map{ k => 
+       
+      val scan = new Scan
+      val filter = new SingleColumnValueFilter(Bytes.toBytes("event"),
+                                               Bytes.toBytes("priority_id"), 
+                                               CompareOp.valueOf("NOT_EQUAL"),
+                                               new BinaryComparator(Bytes.toBytes("1")))
+      
+      filter.setFilterIfMissing(false)
+      
+      scan.setTimeRange(timeSuperior1 + deltaT2*(k-1), timeSuperior1 + deltaT2*k)
+      
+      scan.setFilter(filter)
+      
+      println("TimeRange: "+scan.getTimeRange.toString())
     
- 
+      val scanner = HogHBaseRDD.hogzilla_flows.getScanner(scan).iterator()
+    
+      while(scanner.hasNext())
+      {
+        HogHBaseRDD.hogzilla_flows.delete(new Delete(scanner.next().getRow))
+      }
+    }
     /*
    
    

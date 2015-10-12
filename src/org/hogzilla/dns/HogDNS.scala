@@ -152,11 +152,12 @@ object HogDNS {
 
   println("Counting HogRDD...")
   val RDDtotalSize= DnsRDD.count()
-    
+  println("Filtered HogRDD has "+RDDtotalSize+" rows!")
+  
   println("Calculating some variables to normalize data...")
   val DnsRDDcount = DnsRDD.map(flow => features.map { feature => flow.get(feature).toDouble }).cache()
+  val n = RDDtotalSize
   val numCols = DnsRDDcount.first.length
-  val n = DnsRDDcount.count()
   val sums = DnsRDDcount.reduce((a,b) => a.zip(b).map(t => t._1 + t._2))
   val sumSquares = DnsRDDcount.fold(
       new Array[Double](numCols)
@@ -180,6 +181,7 @@ object HogDNS {
   println("Normalizing data...")
     val labelAndData = DnsRDD.map { flow => 
      val vector = Vectors.dense(features.map { feature => flow.get(feature).toDouble })
+       // ( (DNS,1,lele.com,flow) , vector )
        ((flow.get("flow:detected_protocol"), 
           if (flow.get("event:priority_id")!=null && flow.get("event:priority_id").equals("1")) 1 else 0 , 
           flow.get("flow:host_server_name"),flow),normalize(vector)
@@ -190,6 +192,8 @@ object HogDNS {
     val data = labelAndData.values.cache()
     val kmeans = new KMeans()
     kmeans.setK(numberOfClusters)
+    val vectorCount = data.count()
+    println("Number of vectors: "+vectorCount)
     val model = kmeans.run(data)
     
     println("Predicting points (ie, find cluster for each point)...")
@@ -199,7 +203,7 @@ object HogDNS {
         (cluster,label,datum)
     })
     
-    println("Generating histogram and normalizing...")
+    println("Generating histogram...")
     val clusterLabelCount = clusterLabel.map({
       case (cluster,label,datum) =>
         val map: Map[(Int,String),(Double,Int)] = new HashMap[(Int,String),(Double,Int)]

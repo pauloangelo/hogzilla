@@ -151,11 +151,12 @@ object HogHTTP {
 
   println("Counting HogRDD...")
   val RDDtotalSize= HttpRDD.count()
+  println("Filtered HogRDD has "+RDDtotalSize+" rows!")
     
   println("Calculating some variables to normalize data...")
   val HttpRDDcount = HttpRDD.map(flow => features.map { feature => flow.get(feature).toDouble }).cache()
+  val n = RDDtotalSize
   val numCols = HttpRDDcount.first.length
-  val n = HttpRDDcount.count()
   val sums = HttpRDDcount.reduce((a,b) => a.zip(b).map(t => t._1 + t._2))
   val sumSquares = HttpRDDcount.fold(
       new Array[Double](numCols)
@@ -189,6 +190,8 @@ object HogHTTP {
     val data = labelAndData.values.cache()
     val kmeans = new KMeans()
     kmeans.setK(numberOfClusters)
+    val vectorCount = data.count()
+    println("Number of vectors: "+vectorCount)
     val model = kmeans.run(data)
     
     println("Predicting points (ie, find cluster for each point)...")
@@ -198,7 +201,7 @@ object HogHTTP {
         (cluster,label,datum)
     })
     
-    println("Generating histogram and normalizing...")
+    println("Generating histogram...")
     val clusterLabelCount = clusterLabel.map({
       case (cluster,label,datum) =>
         val map: Map[(Int,String),(Double,Int)] = new HashMap[(Int,String),(Double,Int)]
