@@ -53,7 +53,7 @@ object HogPrepare {
   *  You can change this, but the time below are reasonable
   *                   
   *  tSup2     = now - timeUnit    
-  *  tSup1     = now - 10*timeUnit
+  *  tSup1     = now - 100*timeUnit
   *  denseTime = 2*timeUnit
   *  
   *  24h = 86400000
@@ -66,8 +66,8 @@ object HogPrepare {
     println("Cleaning HBase...")
     val now = System.currentTimeMillis
     
-    val timeUnit = 21600000 /* maybe one day (86400000) or half (43200000) */
-    val timeSuperior1 = now - timeUnit*10
+    val timeUnit:Long = 21600000 /* maybe one day (86400000) or half (43200000) */
+    val timeSuperior1 = now - (timeUnit*100)
     val timeSuperior2 = now - timeUnit
     val nSplits = 4 /* number of parallel tasks */
     val denseTime = timeUnit*4
@@ -75,7 +75,7 @@ object HogPrepare {
     val deltaT2 = (timeSuperior2-timeSuperior1)/nSplits
  
     println("Removing all older than "+timeSuperior1)
-    (0 to nSplits).toList.par.map{ k => 
+    val totalOld = (0 to nSplits).toList.par.map({ k => 
        
       val scan = new Scan
       
@@ -89,14 +89,20 @@ object HogPrepare {
     
       val scanner = HogHBaseRDD.hogzilla_flows.getScanner(scan).iterator()
     
+      var counter=0;
       while(scanner.hasNext())
       {
         HogHBaseRDD.hogzilla_flows.delete(new Delete(scanner.next().getRow))
+        counter+=1
       }
-    }
+      
+      counter
+    }).reduce( (a,b) => a+b)
+    
+    println("Old rows dropped: "+totalOld)
     
     println("Removing flows w/o events priority 1, which are between "+timeSuperior1+" and "+timeSuperior2)
-    (1 to nSplits).toList.par.map{ k => 
+    val totalWOEvent = (1 to nSplits).toList.par.map({ k => 
        
       val scan = new Scan
       val filter = new SingleColumnValueFilter(Bytes.toBytes("event"),
@@ -114,11 +120,17 @@ object HogPrepare {
     
       val scanner = HogHBaseRDD.hogzilla_flows.getScanner(scan).iterator()
     
+      var counter=0;
       while(scanner.hasNext())
       {
         HogHBaseRDD.hogzilla_flows.delete(new Delete(scanner.next().getRow))
+        counter+=1
       }
-    }
+      counter
+    }).reduce((a,b) => a+b)
+    
+    println("Flows without event priority 1 dropped: "+totalWOEvent)
+    
     /*
    
    

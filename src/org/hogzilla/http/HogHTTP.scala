@@ -50,7 +50,7 @@ object HogHTTP {
   val signature = (HogSignature(3,"HZ: Suspicious HTTP flow identified by K-Means clustering",2,1,826000101,826).saveHBase(),
                    HogSignature(3,"HZ: Suspicious HTTP flow identified by SuperBag",2,1,826000102,826).saveHBase())
                    
-  val numberOfClusters=9
+  val numberOfClusters=16
   val maxAnomalousClusterProportion=0.05
   val minDirtyProportion=0.001
   
@@ -147,7 +147,13 @@ object HogHTTP {
           val upper_ip = result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("upper_ip"))
           new HogFlow(map,lower_ip,upper_ip)
         }
-    }.filter(x => ( x.get("flow:lower_port").equals("80") || x.get("flow:lower_port").equals("80") ) && x.get("flow:packets").toDouble.>(1)).cache
+    }.filter(x => ( x.get("flow:lower_port").equals("80") || 
+                    x.get("flow:upper_port").equals("80") || 
+                    x.get("flow:lower_port").equals("81") || 
+                    x.get("flow:upper_port").equals("81")
+                  ) && x.get("flow:packets").toDouble.>(1)
+                    && x.get("flow:id").split('.')(0).toLong.<(System.currentTimeMillis()-300000)
+             ).cache
 
   println("Counting HogRDD...")
   val RDDtotalSize= HttpRDD.count()

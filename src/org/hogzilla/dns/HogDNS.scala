@@ -148,7 +148,11 @@ object HogDNS {
           val upper_ip = result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("upper_ip"))
           new HogFlow(map,lower_ip,upper_ip)
         }
-    }.filter(x =>  ( x.get("flow:lower_port").equals("53") || x.get("flow:upper_port").equals("53")) && x.get("flow:packets").toDouble.>(1)).cache
+    }.filter(x =>  ( x.get("flow:lower_port").equals("53") ||
+                     x.get("flow:upper_port").equals("53")
+                   ) && x.get("flow:packets").toDouble.>(1)
+                     && x.get("flow:id").split('.')(0).toLong.<(System.currentTimeMillis()-300000)
+             ).cache
 
   println("Counting HogRDD...")
   val RDDtotalSize= DnsRDD.count()
