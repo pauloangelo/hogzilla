@@ -1,6 +1,6 @@
-## 0. SUMMARY
+### 0. SUMMARY
 
-## 1. COPYRIGHT
+### 1. COPYRIGHT
 
-## 2. CONTACT
+### 2. CONTACT
 
