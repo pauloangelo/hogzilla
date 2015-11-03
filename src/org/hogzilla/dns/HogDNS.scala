@@ -91,10 +91,10 @@ object HogDNS {
     event.text = "This flow was detected by Hogzilla as an anormal activity. In what follows you can see more information.\n"+
                  "Hostname mentioned in DNS flow: "+hostname+"\n"+
                  "Hogzilla module: HogDNS, Method: k-means clustering with k="+numberOfClusters+"\n"+
-                 "URL for more information: http://ids-hogzilla.org/signature-db/"+"%.0f".format(signature._1.signature_id)+"\n"+
-                 "Centroids:\n"+centroids+"\n"+
-                 "Vector: "+vector+"\n"+
-                 "(cluster,label nDPI): "+clusterLabel+"\n"
+                 "URL for more information: http://ids-hogzilla.org/signature-db/"+"%.0f".format(signature._1.signature_id)+"\n"+""
+                // "Centroids:\n"+centroids+"\n"+
+                // "Vector: "+vector+"\n"+
+                // "(cluster,label nDPI): "+clusterLabel+"\n"
     
     event.signature_id = signature._1.signature_id
                  
@@ -151,7 +151,7 @@ object HogDNS {
     }.filter(x =>  ( x.get("flow:lower_port").equals("53") ||
                      x.get("flow:upper_port").equals("53")
                    ) && x.get("flow:packets").toDouble.>(1)
-                     && x.get("flow:id").split('.')(0).toLong.<(System.currentTimeMillis()-300000)
+                     && x.get("flow:id").split('.')(0).toLong.<(System.currentTimeMillis()-6000000)
              ).cache
 
   println("Counting HogRDD...")
@@ -248,6 +248,7 @@ object HogDNS {
 
       val thr=maxAnomalousClusterProportion*RDDtotalSize
       
+      
       println("Selecting cluster to be tainted...")
       val taintedArray = clusterLabelCount.keySet().toArray().filter({ case (cluster:Int,label:String) => 
                          ((clusterLabelCount.get((cluster,label))._2.toDouble) < thr) &&
@@ -255,10 +256,11 @@ object HogDNS {
                      }).
                   sortBy ({ case (cluster:Int,label:String) => clusterLabelCount.get((cluster,label))._1.toDouble }).reverse
       
-      if(taintedArray.length >0)
+      taintedArray.par.map 
       {
+        tainted =>
         
-        val tainted = taintedArray.apply(0)
+        //val tainted = taintedArray.apply(0)
                   
         println("######################################################################################")
         println("Tainted flows of: "+tainted.toString())
@@ -289,7 +291,9 @@ object HogDNS {
       println("######################################################################################")
       println("######################################################################################")           
 
-   }else
+   }
+      
+   if(taintedArray.length.equals(0))
    {
         println("No flow matched!")
    }

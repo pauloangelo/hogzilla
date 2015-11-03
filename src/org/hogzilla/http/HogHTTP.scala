@@ -50,7 +50,7 @@ object HogHTTP {
   val signature = (HogSignature(3,"HZ: Suspicious HTTP flow identified by K-Means clustering",2,1,826000101,826).saveHBase(),
                    HogSignature(3,"HZ: Suspicious HTTP flow identified by SuperBag",2,1,826000102,826).saveHBase())
                    
-  val numberOfClusters=16
+  val numberOfClusters=32
   val maxAnomalousClusterProportion=0.05
   val minDirtyProportion=0.001
   
@@ -84,10 +84,10 @@ object HogHTTP {
     event.text = "This flow was detected by Hogzilla as an anormal activity. In what follows you can see more information.\n"+
                  "Hostname mentioned in HTTP flow: "+hostname+"\n"+
                  "Hogzilla module: HogHTTP, Method: k-means clustering with k="+numberOfClusters+"\n"+
-                 "URL for more information: http://ids-hogzilla.org/signature-db/"+"%.0f".format(signature._1.signature_id)+"\n"+
-                 "Centroids:\n"+centroids+"\n"+
-                 "Vector: "+vector+"\n"+
-                 "(cluster,label nDPI): "+clusterLabel+"\n"
+                 "URL for more information: http://ids-hogzilla.org/signature-db/"+"%.0f".format(signature._1.signature_id)+"\n"+""
+                 //"Centroids:\n"+centroids+"\n"+
+                 //"Vector: "+vector+"\n"+
+                 //"(cluster,label nDPI): "+clusterLabel+"\n"
   
     event.signature_id = signature._1.signature_id
                  
@@ -152,7 +152,7 @@ object HogHTTP {
                     x.get("flow:lower_port").equals("81") || 
                     x.get("flow:upper_port").equals("81")
                   ) && x.get("flow:packets").toDouble.>(1)
-                    && x.get("flow:id").split('.')(0).toLong.<(System.currentTimeMillis()-300000)
+                    && x.get("flow:id").split('.')(0).toLong.<(System.currentTimeMillis()-6000000)
              ).cache
 
   println("Counting HogRDD...")
@@ -271,7 +271,7 @@ object HogHTTP {
           event.data.put("centroids", centroids)
           event.data.put("vector", datum.toString)
           event.data.put("clusterLabel", "("+cluster.toString()+","+group+")")
-          event.data.put("hostname", flow.get("flow:host_server_name"))
+          event.data.put("hostname", flow.get("flow:host_server_name")+"/"+flow.get("flow:http_url"))
           kmeansPopulate(event).alert()
         }
 
