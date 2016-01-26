@@ -120,6 +120,7 @@ object HogDNS {
 			                   "flow:min_packet_size",
 			                   "flow:packet_size-0",
 			                   "flow:inter_time-0",
+                         "flow:packet_size-1",
 		                     "flow:dns_num_queries",
 			                   "flow:dns_num_answers",
 			                   "flow:dns_ret_code",
@@ -143,6 +144,7 @@ object HogDNS {
           if(map.get("flow:dns_bad_packet")==null) map.put("flow:dns_bad_packet","0")
           if(map.get("flow:dns_query_type")==null) map.put("flow:dns_query_type","0")
           if(map.get("flow:dns_rsp_type")==null) map.put("flow:dns_rsp_type","0")
+          if(map.get("flow:packet_size-1")==null) map.put("flow:packet_size-1","0")
           
           val lower_ip = result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("lower_ip"))
           val upper_ip = result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("upper_ip"))
