@@ -17,20 +17,12 @@
 * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 */
 
-import scala.math.random
-import java.lang.Math
-import org.apache.spark._
-import org.apache.hadoop.hbase.client.HBaseAdmin
-import org.apache.hadoop.hbase.util.Bytes
-import org.apache.hadoop.hbase.{HBaseConfiguration, HTableDescriptor, TableName}
-import org.apache.hadoop.hbase.mapreduce.TableInputFormat
-import org.apache.spark.mllib.regression.{LabeledPoint,LinearRegressionModel,LinearRegressionWithSGD}
-import org.apache.spark.mllib.linalg.Vectors
-import org.hogzilla.hbase._
-import org.hogzilla.dns.HogDNS
-import org.hogzilla.prepare._
+import org.apache.spark.SparkConf
+import org.apache.spark.SparkContext
+import org.hogzilla.hbase.HogHBaseRDD
 import org.hogzilla.initiate.HogInitiate
-import org.hogzilla.http.HogHTTP
+import org.hogzilla.prepare.HogPrepare
+import org.hogzilla.sflow.HogSFlow
 
 /**
  * 
@@ -52,6 +44,7 @@ object Hogzilla {
     // Get the HBase RDD
     val HogRDD = HogHBaseRDD.connect(spark);
     
+    
     // Initiate HogZilla
     HogInitiate.initiate(spark);
     
@@ -59,13 +52,18 @@ object Hogzilla {
     HogPrepare.prepare(HogRDD)
     
     // Run algorithms for DNS protocol
-    HogDNS.run(HogRDD,spark);
+    //HogDNS.run(HogRDD,spark);
     
     // Run algorithms for HTTP protocol
-    HogHTTP.run(HogRDD,spark);
+    //HogHTTP.run(HogRDD,spark);
     
     // Run algorithms for SMTP protocol
     //HogSMTP.run(HogRDD);
+    
+    // ============================ Run algorithms for SFlows ============================
+    
+    val HogRDDSFlow = HogHBaseRDD.connectSFlow(spark);
+    HogSFlow.run(HogRDDSFlow,spark);
     
     // Stop Spark
     spark.stop()

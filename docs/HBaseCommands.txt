@@ -1,5 +1,24 @@
 
 create 'hogzilla_flows','flow','event'
+create 'hogzilla_sflows','flow'
 create 'hogzilla_events','event'
 create 'hogzilla_sensor','sensor'
 create 'hogzilla_signatures','signature'
+create 'hogzilla_mynets','net'
+create 'hogzilla_reputation','rep'
+
+put 'hogzilla_mynets', '10.', 'net:description', 'Intranet 1'
+put 'hogzilla_mynets', '10.', 'net:prefix', '10.'
+
+
+put 'hogzilla_reputation', '10.1.2.155', 'rep:description', 'SMTP Server'
+put 'hogzilla_reputation', '10.1.2.155', 'rep:ip', '10.1.1.1'
+put 'hogzilla_reputation', '10.1.2.155', 'rep:list', 'MX'
+put 'hogzilla_reputation', '10.1.2.155', 'rep:list_type', 'whitelist'
+
+
+put 'hogzilla_reputation', '10.1.101.101', 'rep:description', 'Big Talker 1'
+put 'hogzilla_reputation', '10.1.101.101', 'rep:ip', '10.1.1.1'
+put 'hogzilla_reputation', '10.1.101.101', 'rep:list', 'TTalker'
+put 'hogzilla_reputation', '10.1.101.101', 'rep:list_type', 'whitelist'
+

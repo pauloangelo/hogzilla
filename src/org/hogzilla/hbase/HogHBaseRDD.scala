@@ -47,13 +47,19 @@ object HogHBaseRDD {
                      "flow:dns_num_queries","flow:dns_num_answers","flow:dns_ret_code","flow:dns_bad_packet","flow:dns_query_type","flow:dns_query_class","flow:dns_rsp_type",
                      "event:sensor_id","event:event_id","event:event_second","event:event_microsecond","event:signature_id","event:generator_id","event:classification_id","event:priority_id",
                      "flow:http_method","flow:http_url","flow:http_content_type") 
-  
+ 
+  val columnsSFlow = List("flow:IPprotocol","flow:IPsize","flow:agentID","flow:dstIP","flow:dstMAC","flow:dstPort","flow:ethernetType","flow:inVlan","flow:inputPort","flow:ipTos",
+                          "flow:ipTtl","flow:outVlan","flow:outputPort","flow:packetSize","flow:samplingRate","flow:srcIP","flow:srcMAC","flow:srcPort","flow:tcpFlags")
+                     
   // "flow:inter_time-%d","flow:packet_size-%d"
 
-  val hogzilla_flows = new HTable(conf,"hogzilla_flows")
+  val hogzilla_flows  = new HTable(conf,"hogzilla_flows")
+  val hogzilla_sflows = new HTable(conf,"hogzilla_sflows")
   val hogzilla_events = new HTable(conf,"hogzilla_events")
   val hogzilla_sensor = new HTable(conf,"hogzilla_sensor")
   val hogzilla_signatures = new HTable(conf,"hogzilla_signatures")
+  val hogzilla_mynets = new HTable(conf,"hogzilla_mynets")
+  val hogzilla_reputation = new HTable(conf,"hogzilla_reputation")
 
   
   def connect(spark: SparkContext):RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)]=
@@ -78,6 +84,28 @@ object HogHBaseRDD {
      return hBaseRDD
   }
   
+  def connectSFlow(spark: SparkContext):RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)]=
+  {
+    val table = "hogzilla_sflows"
+ 
+    conf.set(TableInputFormat.INPUT_TABLE, table)
+    conf.set("zookeeper.session.timeout", "600000")
+    conf.setInt("hbase.client.scanner.timeout.period", 600000)
+    //conf.set("hbase.rpc.timeout", "1800000")
+    // You can limit the SCANNED COLUMNS here  
+    //conf.set(TableInputFormat.SCAN_COLUMNS, "flow:packets,flow:detected_protocol"),
+
+   
+   if (!admin.isTableAvailable(table)) {
+     println("Table hogzilla_sflows does not exist.")
+    }
+    
+     val hBaseRDD = spark.newAPIHadoopRDD(conf, classOf[TableInputFormat],
+                                                classOf[org.apache.hadoop.hbase.io.ImmutableBytesWritable],
+                                                classOf[org.apache.hadoop.hbase.client.Result])
+                                                
+     return hBaseRDD
+  }
     
   def close()
   {
