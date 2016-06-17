@@ -24,8 +24,6 @@
 
 package org.hogzilla.http
 
-import java.util.HashMap
-import java.util.Map
 import scala.math.random
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark._
@@ -41,6 +39,8 @@ import org.apache.spark.mllib.classification.SVMWithSGD
 import scala.tools.nsc.doc.base.comment.OrderedList
 import org.apache.spark.mllib.optimization.L1Updater
 import org.hogzilla.util.HogFlow
+import scala.collection.mutable.HashMap
+import scala.collection.mutable.Map
 
 /**
  * 
@@ -185,10 +185,11 @@ object HogHTTP {
     
   println("Normalizing data...")
     val labelAndData = HttpRDD.map { flow => 
-     val vector = Vectors.dense(features.map { feature => flow.get(feature).toDouble })
-       ((flow.get("flow:detected_protocol"), 
-          if (flow.get("event:priority_id")!=null && flow.get("event:priority_id").equals("1")) 1 else 0 , 
-          flow.get("flow:host_server_name"),flow),normalize(vector)
+      val vector = Vectors.dense(features.map { feature => flow.get(feature).toDouble })
+       ( (flow.get("flow:detected_protocol"), 
+           if (flow.get("event:priority_id")!=null && flow.get("event:priority_id").equals("1")) 1 else 0 , 
+           flow.get("flow:host_server_name"),flow),
+         normalize(vector)
        )
     }
   
@@ -214,6 +215,18 @@ object HogHTTP {
         map.put((cluster,label._1),  (label._2.toDouble,1))
         map
     }).reduce((a,b) => { 
+      
+       b./:(0){
+         case (c,((key:(Int,String)),(avg2,count2))) =>
+           
+                val avg = (a.get(key).get._1*a.get(key).get._2 + b.get(key).get._1*b.get(key).get._2)/
+                          (a.get(key).get._2+b.get(key).get._2)
+                          
+                a.put(key, (avg,a.get(key).get._2+b.get(key).get._2))
+           
+               0
+              }
+      /*
       b.keySet().toArray()
       .map { 
         case key: (Int,String) =>  
@@ -225,7 +238,7 @@ object HogHTTP {
               a.put(key, (avg,a.get(key)._2+b.get(key)._2))
             }else
               a.put(key,b.get(key))
-      }
+      }*/
       a
     })
     
@@ -238,22 +251,25 @@ object HogHTTP {
     val centroids = ""+model.clusterCenters.mkString(",\n")
     //model.clusterCenters.foreach { center => centroids.concat("\n"+center.toString) }
     
-    clusterLabelCount.keySet().toArray().foreach { case key:(Int,String) =>  
+    clusterLabelCount./:(0) 
+     { case (z,(key:(Int,String),(avg,count))) =>  
       val cluster = key._1
       val label = key._2
-      val count =clusterLabelCount.get(key)._2.toString
-      val avg = clusterLabelCount.get(key)._1.toString
+      //val count =clusterLabelCount.get(key).get._2.toString
+      //val avg = clusterLabelCount.get(key).get._1.toString
       println(f"Cluster: $cluster%1s\t\tLabel: $label%20s\t\tCount: $count%10s\t\tAvg: $avg%10s")
+      0
       }
 
       val thr=maxAnomalousClusterProportion*RDDtotalSize
       
       println("Selecting cluster to be tainted...")
-      val taintedArray = clusterLabelCount.keySet().toArray().filter({ case (cluster:Int,label:String) => 
-                         ((clusterLabelCount.get((cluster,label))._2.toDouble) < thr) &&
-                         clusterLabelCount.get((cluster,label))._1.toDouble >= minDirtyProportion
-                     }).
-                  sortBy ({ case (cluster:Int,label:String) => clusterLabelCount.get((cluster,label))._1.toDouble }).reverse
+      val taintedArray = clusterLabelCount.filter({ case (key:(Int,String),(avg,count)) => 
+                                                          (count.toDouble < thr 
+                                                              && avg.toDouble >= minDirtyProportion )
+                          }).map(_._1)
+                //.
+                //  sortBy ({ case (cluster:Int,label:String) => clusterLabelCount.get((cluster,label))._1.toDouble }).reverse
       
       taintedArray.par.map 
       {
@@ -292,7 +308,7 @@ object HogHTTP {
 
    }
       
-   if(taintedArray.length.equals(0))
+   if(taintedArray.isEmpty)
    {
         println("No flow matched!")
    }

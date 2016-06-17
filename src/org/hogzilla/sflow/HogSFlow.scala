@@ -24,10 +24,11 @@
 
 package org.hogzilla.sflow
 
-//import java.util.ArrayList
-import java.util.HashMap
-import java.util.Map
+import scala.collection.mutable.HashMap
+import scala.collection.mutable.HashSet
+import scala.collection.mutable.Map
 import scala.math.random
+
 import org.apache.hadoop.hbase.client.Scan
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark._
@@ -37,23 +38,19 @@ import org.apache.spark.rdd.PairRDDFunctions
 import org.apache.spark.rdd.RDD
 import org.hogzilla.event.HogEvent
 import org.hogzilla.event.HogSignature
+import org.hogzilla.hbase.HogHBaseHistogram
 import org.hogzilla.hbase.HogHBaseRDD
+import org.hogzilla.histogram.HogHistogram
+import org.hogzilla.util.Histograms
 import org.hogzilla.util.HogFlow
-import org.apache.hadoop.hbase.filter.SingleColumnValueFilter
-import org.apache.hadoop.hbase.filter.BinaryComparator
-import org.apache.hadoop.hbase.filter.FilterList
-import org.apache.hadoop.hbase.filter.CompareFilter
-import org.apache.hadoop.hbase.filter.Filter
-import org.hogzilla.hbase.HogHBaseReputation
-import scala.collection.mutable.ArraySeq
-import scala.collection.mutable.HashSet
 
 /**
  * 
  */
 object HogSFlow {
 
-  val signature = (HogSignature(3,"HZ: Top talker identified",2,1,826001001,826).saveHBase())
+  val signature = (HogSignature(3,"HZ: Top talker identified" ,2,1,826001001,826).saveHBase(),
+                   HogSignature(3,"HZ: SMTP talker identified",2,1,826001002,826).saveHBase())
       
   
   /**
@@ -70,25 +67,32 @@ object HogSFlow {
   }
   
   
-  /**
-   * 
-   * 
-   * 
-   */
-  def populate(event:HogEvent):HogEvent =
+  
+  def populateTopTalker(event:HogEvent):HogEvent =
   {
-  
     val hostname:String = event.data.get("hostname")
+    val bytes:String = event.data.get("bytes")
     
-    
-    event.text = "This flow was detected by Hogzilla as an anormal activity. In what follows you can see more information.\n"+
-                 "Hostname mentioned in HTTP flow: "+hostname+"\n"
-                 //"Centroids:\n"+centroids+"\n"+
-                 //"Vector: "+vector+"\n"+
-                 //"(cluster,label nDPI): "+clusterLabel+"\n"
+    event.text = "This IP was detected by Hogzilla as an abnormal activity. In what follows, you can see more information.\n"+
+                  "Abnormal behaviour: Large amount of sent data\n"+
+                  "IP: "+hostname+"\n"+
+                  "Bytes: "+bytes+"\n"
   
-    event.signature_id = signature.signature_id
-                 
+    event.signature_id = signature._1.signature_id       
+    event
+  }
+  
+  def populateSMTPTalker(event:HogEvent):HogEvent =
+  {
+    val src:String = event.data.get("src")
+    val dst:String = event.data.get("dst")
+    val bytes:String = event.data.get("bytes")
+    
+    event.text = "This IP was detected by Hogzilla as an abnormal activity. In what follows, you can see more information.\n"+
+                  "Abnormal behaviour: SMTP communication\n"+
+                  " "+src+" <-> "+dst+"  ("+bytes+" bytes)\n"
+                  
+    event.signature_id = signature._2.signature_id       
     event
   }
   
@@ -132,8 +136,16 @@ object HogSFlow {
     {
       myNets.add(Bytes.toString(it.next().getValue(Bytes.toBytes("net"),Bytes.toBytes("prefix"))))
     }
+  
     
   
+ /*
+  * 
+  * Top Talkers
+  * 
+  */
+    
+/* ======================================================================================    
   val whiteTopTalkers = HogHBaseReputation.getReputationList("TTalker","whitelist")
   
   
@@ -148,24 +160,33 @@ object HogSFlow {
                                             { true } else{false} 
                                     }.contains(true)
           })
-    .take(30+whiteTopTalkers.size)
-    .filter(tp => !whiteTopTalkers.contains(tp._1) )
+    .take(2000+whiteTopTalkers.size)
+    .filter(tp => {  !whiteTopTalkers.map { net => if( tp._1.startsWith(net) )
+                                            { true } else{false} 
+                                    }.contains(true)
+          })
     .take(30)
-    .foreach{ tp => println("("+tp._1+","+tp._2+")" ) }
-
-    /*
-  println("")
-  println("Top Talkers (flows):")
-  println("(LowerIP <-> UpperIP, Flows)")
-  val g12: PairRDDFunctions[String, Long] = 
-    SflowRDD.map( hogflow => (Bytes.toString(hogflow.lower_ip)+"<->"+Bytes.toString(hogflow.upper_ip),1L) )
-    
-  g12.reduceByKey(_+_).sortBy(_._2, false, 10)
-    .take(30+whiteTopTalkers.size)
-    .filter(tp => !whiteTopTalkers.contains(tp._1))
-    .take(30)
-    .foreach{ tp => println("("+tp._1+","+tp._2+")" ) }
+    .foreach{ case (talker,bytes) => 
+                    println("("+talker+","+bytes+")" ) 
+                    val flowMap: Map[String,String] = new HashMap[String,String]
+                    flowMap.put("flow:id",talker+System.currentTimeMillis)
+                    val event = new HogEvent(new HogFlow(flowMap,InetAddress.getByName(talker).getAddress,
+                                                                 InetAddress.getByName("1.1.1.1").getAddress))
+                    event.data.put("hostname", talker)
+                    event.data.put("bytes", bytes.toString)
+                    populateTopTalker(event).alert()
+             }
   
+  
+================================================================================================ */
+    
+ /*
+  * 
+  * SMTP Talkers
+  * 
+  */
+    
+/* ======================================================================================    
   
   val whiteSMTPTalkers =  HogHBaseReputation.getReputationList("MX","whitelist")
 
@@ -180,15 +201,239 @@ object HogSFlow {
                            }
   g2.reduceByKey{case ((a1,b1),(a2,b2)) => (a1+a2,b1+b2)}
     .sortBy({case ((src,dst),(bytes,qtFlows)) => bytes} , false, 10)
-    .take(30+whiteSMTPTalkers.size)
+    .take(1000+whiteSMTPTalkers.size)
     .filter{case ((a1,b1),(a2,b2)) => ! (whiteSMTPTalkers.contains(a1) || whiteSMTPTalkers.contains(b1)) }
     .take(30)
-    .foreach{case ((src,dst),(bytes,qtFlows)) => println("("+src+","+dst+","+bytes+","+qtFlows+")")}
+    .foreach{case ((src,dst),(bytes,qtFlows)) => println("("+src+","+dst+","+bytes+","+qtFlows+")")
+                    val flowMap: Map[String,String] = new HashMap[String,String]
+                    flowMap.put("flow:id",src+dst+System.currentTimeMillis)
+                    val event = new HogEvent(new HogFlow(flowMap,InetAddress.getByName(src).getAddress,
+                                                                 InetAddress.getByName(dst).getAddress))
+                    event.data.put("src", src)
+                    event.data.put("dst", dst)
+                    event.data.put("bytes", bytes.toString)
+                    populateSMTPTalker(event).alert()
+             }
+             
+  ================================================================================================ */
   
- */
+ 
+ /*
+  * 
+  * Port Hist
+  * 
+  */
+  
 
+  println("")
+  println("Port histograms 01")
+          
+      
+   val g3: PairRDDFunctions[String, (Map[String,Double], Long)] 
+                      = SflowRDD.filter { flow => flow.map.get("flow:tcpFlags").get.equals("0x12") }
+                      .filter(flow => {  myNets.map { net =>
+                                                         if( flow.map.get("flow:srcIP").get.startsWith(net) )
+                                                          { true } else{false} 
+                                                    }.contains(true)
+                      }).map { flow => 
+                               val map:Map[String,Double]=new HashMap[String,Double]
+                               map.put(flow.map.get("flow:srcPort").get, 1D)                        
+                       
+                               (flow.map.get("flow:srcIP").get,
+                                 (map,1L)
+                               ) 
+                           }
+            
+   //println("Filtered RDD: "+g3.countByKey())
+   
+   val g3b = g3.reduceByKey{case ((map1,qtd1),(map2,qtd2)) => 
+                       map2./:(0){case  (c,(key,qtdH))=> val qtdH2 = {if(map1.get(key).isEmpty) 0 else map1.get(key).get }
+                                                        map1.put(key,  qtdH2 + qtdH) 
+                                  0
+                                 }
+                      (map1,qtd1+qtd2)
+                 }
+    .map({ case (srcIP,(map,qtd)) =>
+                            (srcIP,(map.map({ case (qtdString,qtdC) => (qtdString,qtdC/qtd.toDouble) }),qtd))
+         })
+         
+    println("Mapped RDD: "+g3b.count())
+   
+    g3b.foreach{case (srcIP,(map,qtd)) => 
+                    
+                    val hogHistogram=HogHBaseHistogram.getHistogram("HIST01-"+srcIP)
+                    
+                    
+                    if(hogHistogram.histSize< 1000)
+                    {
+                      // Learn more!
+                      println("IP: "+srcIP+ "  (N:"+qtd+",S:"+hogHistogram.histSize+") - Learn More!")
+                      HogHBaseHistogram.saveHistogram(Histograms.merge(hogHistogram, new HogHistogram("",qtd,map)))
+
+                    }else
+                    {
+
+                    	    //val KBDistance = Histograms.KullbackLiebler(hogHistogram.histMap, map)
+                    			val atypical   = Histograms.atypical(hogHistogram.histMap, map)
+                          
+                          if(srcIP.equals("10.1.101.101xxx"))
+                          {
+                            println("IP: "+srcIP+ "  (N:"+qtd+",S:"+hogHistogram.histSize+") - Atypical ports: "+atypical)
+                              println("Saved:")
+                            hogHistogram.histMap./:(0){case  (c,(key,qtd))=>
+                            println(key+": "+ qtd)
+                            0
+                            } 
+                            println("Now:")
+                            map./:(0){case  (c,(key,qtd))=>
+                            println(key+": "+ qtd)
+                            0
+                            }
+                          }
+
+                    			//println("KB: "+KBDistance)
+                    			//println("ATypical: "+atypical)
+                    			if(atypical.size > 0)
+                    			{
+                            println("IP: "+srcIP+ "  (N:"+qtd+",S:"+hogHistogram.histSize+") - Atypical ports: "+atypical)
+                            /*
+                    				println("Saved:")
+                    				hogHistogram.histMap./:(0){case  (c,(key,qtd))=>
+                    				println(key+": "+ qtd)
+                    				0
+                    				} 
+                    				println("Now:")
+                    				map./:(0){case  (c,(key,qtd))=>
+                    				println(key+": "+ qtd)
+                    				0
+                    				} 
+                            */
+                    			}
+                          
+                          HogHBaseHistogram.saveHistogram(Histograms.merge(hogHistogram, new HogHistogram("",qtd,map)))
+                    }
+                    
+             }
+    
+    
+    
+    /*
+  * 
+  * Port Hist
+  * 
+  */
   
+
+  println("")
+  println("Port histograms 02")
+          
+      //.filter { flow => flow.map.get("flow:tcpFlags").get.equals("0x12") }
+   val g4: PairRDDFunctions[String, (Map[String,Double], Long)] 
+                      = SflowRDD
+                      .filter(flow => {  myNets.map { net =>
+                                                         if( flow.map.get("flow:dstIP").get.startsWith(net) )
+                                                          { true } else{false} 
+                                                    }.contains(true) && (flow.map.get("flow:srcPort").get.toLong < 10000)
+                      }).map { flow => 
+                               val map:Map[String,Double]=new HashMap[String,Double]
+                               map.put(flow.map.get("flow:srcPort").get, 1D)                        
+                       
+                               (flow.map.get("flow:dstIP").get,
+                                 (map,1L)
+                               ) 
+                           }
+            
+   //println("Filtered RDD: "+g3.countByKey())
+   
+   val g4b = g4.reduceByKey{case ((map1,qtd1),(map2,qtd2)) => 
+                       map2./:(0){case  (c,(key,qtdH))=> val qtdH2 = {if(map1.get(key).isEmpty) 0 else map1.get(key).get }
+                                                        map1.put(key,  qtdH2 + qtdH) 
+                                  0
+                                 }
+                      (map1,qtd1+qtd2)
+                 }
+    .map({ case (dstIP,(map,qtd)) =>
+                            (dstIP,(map.map({ case (qtdString,qtdC) => (qtdString,qtdC/qtd.toDouble) }),qtd))
+         })
+         
+    println("Mapped RDD2: "+g4b.count())
+   
+    g4b.foreach{case (dstIP,(map,qtd)) => 
+                    
+                    val hogHistogram=HogHBaseHistogram.getHistogram("HIST02-"+dstIP)
+                    
+                    
+                    if(hogHistogram.histSize< 1000)
+                    {
+                      // Learn more!
+                      println("IP: "+dstIP+ "  (N:"+qtd+",S:"+hogHistogram.histSize+") - Learn More!")
+                      HogHBaseHistogram.saveHistogram(Histograms.merge(hogHistogram, new HogHistogram("",qtd,map)))
+
+                    }else
+                    {
+
+                          //val KBDistance = Histograms.KullbackLiebler(hogHistogram.histMap, map)
+                          val atypical   = Histograms.atypical(hogHistogram.histMap, map)
+
+                          
+                          if(atypical.size>0 )
+                          {
+                            println("IP: "+dstIP+ "  (N:"+qtd+",S:"+hogHistogram.histSize+") - Atypical ports: "+atypical)
+                            /*
+                            println("Saved:")
+                            hogHistogram.histMap./:(0){case  (c,(key,qtd))=>
+                            println(key+": "+ qtd)
+                            0
+                            } 
+                            println("Now:")
+                            map./:(0){case  (c,(key,qtd))=>
+                            println(key+": "+ qtd)
+                            0
+                            } 
+                            * 
+                            */
+                          }
+                      HogHBaseHistogram.saveHistogram(Histograms.merge(hogHistogram, new HogHistogram("",qtd,map)))
+
+                    }
+                    
+             }
+    
+    
+    
+    
+    
+    
+    
+    
   
+    /*
+     * 
+                    val flowMap: Map[String,String] = new HashMap[String,String]
+                    flowMap.put("flow:id",src+dst+System.currentTimeMillis)
+                    val event = new HogEvent(new HogFlow(flowMap,InetAddress.getByName(src).getAddress,
+                                                                 InetAddress.getByName(dst).getAddress))
+                    event.data.put("src", src)
+                    event.data.put("dst", dst)
+                    event.data.put("bytes", bytes.toString)
+                    populateSMTPTalker(event).alert()
+      
+      
+                      val it = map2.keySet().iterator()
+                      while(it.hasNext())
+                      {
+                        val key = it.next()
+                        if(map1.containsKey(key))
+                        {
+                          //map1.put(key, (map1.get(key)*qtd1+map2.get(key)*qtd2)/(qtd1+qtd2))
+                          map1.put(key, map1.get(key)+map2.get(key))
+                        }else
+                        {
+                          map1.put(key, map2.get(key))
+                        }
+                      }
+     */
+     
 
   }
   

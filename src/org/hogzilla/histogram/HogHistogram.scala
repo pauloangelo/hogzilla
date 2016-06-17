@@ -17,19 +17,12 @@
 * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
 */
 
-package org.hogzilla.util
+package org.hogzilla.histogram
 
 import scala.collection.mutable.Map
 
+class HogHistogram(val histName:String,val histSize:Long, val histMap:Map[String,Double]) 
+{
 
-
-/**
- * @author pa
- */
-case class HogFlow(map:Map[String,String],lower_ip:Array[Byte],upper_ip:Array[Byte]) {
-  
-  def get(key:String):String =
-  {
-    map.get(key).get
-  }
 }
+

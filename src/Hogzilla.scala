@@ -43,8 +43,7 @@ object Hogzilla {
     
     // Get the HBase RDD
     val HogRDD = HogHBaseRDD.connect(spark);
-    
-    
+        
     // Initiate HogZilla
     HogInitiate.initiate(spark);
     

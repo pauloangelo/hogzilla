@@ -25,8 +25,10 @@
 
 package org.hogzilla.dns
 
-import java.util.HashMap
-import java.util.Map
+
+import scala.collection.mutable.HashMap
+import scala.collection.mutable.Map
+import scala.collection.mutable.HashSet
 import scala.math.random
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark._
@@ -36,7 +38,7 @@ import org.apache.spark.mllib.linalg.Vector
 import org.apache.spark.rdd.RDD
 import org.hogzilla.hbase.HogHBaseRDD
 import org.hogzilla.event.{HogEvent, HogSignature}
-import java.util.HashSet
+
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.mllib.classification.SVMWithSGD
 import scala.tools.nsc.doc.base.comment.OrderedList
@@ -88,7 +90,7 @@ object HogDNS {
     val hostname:String = event.data.get("hostname")
     
     
-    event.text = "This flow was detected by Hogzilla as an anormal activity. In what follows you can see more information.\n"+
+    event.text = "This flow was detected by Hogzilla as an abnormal activity. In what follows you can see more information.\n"+
                  "Hostname mentioned in DNS flow: "+hostname+"\n"+
                  "Hogzilla module: HogDNS, Method: k-means clustering with k="+numberOfClusters+"\n"+
                  "URL for more information: http://ids-hogzilla.org/signature-db/"+"%.0f".format(signature._1.signature_id)+"\n"+""
@@ -216,6 +218,18 @@ object HogDNS {
         map.put((cluster,label._1),  (label._2.toDouble,1))
         map
     }).reduce((a,b) => { 
+      
+        b./:(0){
+         case (c,((key:(Int,String)),(avg2,count2))) =>
+           
+                val avg = (a.get(key).get._1*a.get(key).get._2 + b.get(key).get._1*b.get(key).get._2)/
+                          (a.get(key).get._2+b.get(key).get._2)
+                          
+                a.put(key, (avg,a.get(key).get._2+b.get(key).get._2))
+           
+               0
+              }
+      /*  
       b.keySet().toArray()
       .map { 
         case key: (Int,String) =>  
@@ -228,6 +242,7 @@ object HogDNS {
             }else
               a.put(key,b.get(key))
       }
+      */
       a
     })
     
@@ -240,23 +255,26 @@ object HogDNS {
     val centroids = ""+model.clusterCenters.mkString(",\n")
     //model.clusterCenters.foreach { center => centroids.concat("\n"+center.toString) }
     
-    clusterLabelCount.keySet().toArray().foreach { case key:(Int,String) =>  
+    clusterLabelCount./:(0) 
+     { case (z,(key:(Int,String),(avg,count))) =>    
       val cluster = key._1
       val label = key._2
-      val count =clusterLabelCount.get(key)._2.toString
-      val avg = clusterLabelCount.get(key)._1.toString
+      //val count =clusterLabelCount.get(key)._2.toString
+      //val avg = clusterLabelCount.get(key)._1.toString
       println(f"Cluster: $cluster%1s\t\tLabel: $label%20s\t\tCount: $count%10s\t\tAvg: $avg%10s")
+      0
       }
 
       val thr=maxAnomalousClusterProportion*RDDtotalSize
       
       
       println("Selecting cluster to be tainted...")
-      val taintedArray = clusterLabelCount.keySet().toArray().filter({ case (cluster:Int,label:String) => 
-                         ((clusterLabelCount.get((cluster,label))._2.toDouble) < thr) &&
-                         clusterLabelCount.get((cluster,label))._1.toDouble >= minDirtyProportion
-                     }).
-                  sortBy ({ case (cluster:Int,label:String) => clusterLabelCount.get((cluster,label))._1.toDouble }).reverse
+       val taintedArray = clusterLabelCount.filter({ case (key:(Int,String),(avg,count)) => 
+                                                          (count.toDouble < thr 
+                                                              && avg.toDouble >= minDirtyProportion )
+                          }).map(_._1)
+                //.
+                //  sortBy ({ case (cluster:Int,label:String) => clusterLabelCount.get((cluster,label))._1.toDouble }).reverse
       
       taintedArray.par.map 
       {
@@ -295,7 +313,7 @@ object HogDNS {
 
    }
       
-   if(taintedArray.length.equals(0))
+   if(taintedArray.isEmpty)
    {
         println("No flow matched!")
    }
@@ -321,33 +339,34 @@ object HogDNS {
        def add(flow:Map[String,String]) 
       {
         // Add flow in the Set
-        val value = flows.get((flow.get("flow:lower_name"),flow.get("flow:upper_name"),flow.get("flow:host_server_name")))
+        val value = flows.get((flow.get("flow:lower_name").get,flow.get("flow:upper_name").get,flow.get("flow:host_server_name").get))
         
         if(value == null)
         {
           val a = new HashSet[Map[String,String]]
           val b = new HashMap[String,Double]
           a.add(flow)
-          flows.put((flow.get("flow:lower_name"),flow.get("flow:upper_name"),flow.get("flow:host_server_name")), (a,b,new LabeledPoint(0,Vectors.dense(0))))
+          flows.put((flow.get("flow:lower_name").get,flow.get("flow:upper_name").get,flow.get("flow:host_server_name").get), 
+                    (a,b,new LabeledPoint(0,Vectors.dense(0))))
         }else
         {
-          value._1.add(flow)
+          value.get._1.add(flow)
         }
       } 
       
       def merge(flowset:flowSet):flowSet =
       {
-        val iter = flowset.flows.keySet().toArray().map({ case key:(String,String,String) => 
+        val iter = flowset.flows.keySet.map({ case key:(String,String,String) => 
                       val value = this.flows.get(key)
                       if( value == null)
                       {
                            val a = new HashSet[Map[String,String]]
                            val b = new HashMap[String,Double]
-                           a.addAll(flowset.flows.get(key)._1)
+                           a.++(flowset.flows.get(key).get._1)
                            this.flows.put(key, (a,b,new LabeledPoint(0,Vectors.dense(0)) ))
                       }else
                       {
-                        this.flows.get(key)._1.addAll(flowset.flows.get(key)._1)
+                        this.flows.get(key).get._1.++(flowset.flows.get(key).get._1)
                       }
                    })
           this
@@ -383,25 +402,33 @@ object HogDNS {
           if(map.get("flow:dns_rsp_type")==null) map.put("flow:dns_rsp_type","0")
         map
         }
-    }.filter(x => x.get("flow:lower_port").equals("53") && x.get("flow:packets").toDouble.>(1)).cache
+    }.filter(x => x.get("flow:lower_port").equals("53") && x.get("flow:packets").get.toDouble.>(1)).cache
       
     val superBag = DnsRDD.map({flow => new flowSet(flow) }).reduce((a,b) => a.merge(b)) 
+
     
+/*
+         * Commented after java.Map -> scala.Map
+             
     // compute sizes, inter times, means and stddevs
     val labeledpoints:HashSet[LabeledPoint] = new HashSet()
-    superBag.flows.keySet().toArray().map({ key =>  superBag.flows.get(key)}).map({case (flowSet1:HashSet[Map[String,String]],info:HashMap[String,Double],labeledpoint:LabeledPoint) => 
+    superBag.flows.keySet.map({ key =>  superBag.flows.get(key).get}).map({case (flowSet1:HashSet[Map[String,String]],info:HashMap[String,Double],labeledpoint:LabeledPoint) => 
       
-        if(flowSet1.size()>4)
+        if(flowSet1.size>4)
         {
       
-        val flowSetOrdered = flowSet1.toArray().toSeq.map({  case f:Map[String,String] => f }).sortBy(f => f.get("flow:first_seen").toDouble).toArray
+        val flowSetOrdered = flowSet1.map({  case f:Map[String,String] => f })
+                                    // .sortBy(f => f.get("flow:first_seen").get)
+                                    // .toArray
                 
-        val timeArray:Array[Double] = Array.fill[Double](flowSetOrdered.length)(0)
+        val timeArray:Array[Double] = Array.fill[Double](flowSetOrdered.size)(0)
         var dirty:Double =0;
         var clean:Double =0;
-        
-        (0 to (flowSetOrdered.length-2)).map({ k => 
-             timeArray.update(k, flowSetOrdered(k+1).get("flow:first_seen").toDouble - flowSetOrdered(k).get("flow:first_seen").toDouble)
+  
+    
+         
+        (0 to (flowSetOrdered.size-2)).map({ k => 
+             timeArray.update(k, flowSetOrdered(k+1).get("flow:first_seen").get.toDouble - flowSetOrdered(k).get("flow:first_seen").toDouble)
              
              
              if (flowSetOrdered(k).get("event:priority_id")!=null)
@@ -444,6 +471,7 @@ object HogDNS {
         
         }
     })
+   
   
     val arraylabeledpoints = labeledpoints.toArray().map({ case xy:LabeledPoint => xy })
    
@@ -460,18 +488,18 @@ object HogDNS {
    
    println("Model.intercept: "+model.intercept+" Model.weights: "+model.weights)
    
-    superBag.flows.keySet().toArray().map({ case key:(String,String,String) =>  
+    superBag.flows.keySet.map({ case key:(String,String,String) =>  
     
-        if(superBag.flows.get(key)._1.size()>4)
+        if(superBag.flows.get(key).get._1.size()>4)
         {
       
-      val info = superBag.flows.get(key)._2
+      val info = superBag.flows.get(key).get._2
       
      // val score = model.predict(Vectors.dense(info.get("flow_intertime_count"),info.get("flow_intertime_avg"),info.get("flow_intertime_stddev")) )
-      val score = model.predict(Vectors.dense(info.get("flow_intertime_stddev")) )
+      val score = model.predict(Vectors.dense(info.get("flow_intertime_stddev").get) )
     // print(score+"|")
      
-     if(info.get("flow_intertime_avg")<100000 && info.get("dirty")!=null)
+     if(info.get("flow_intertime_avg").get<100000 && info.get("dirty")!=null)
      println("USED: "+key._1+" <-> "+key._2+", hostname: "+key._3+" ("+info.get("flow_intertime_count").toString+","+info.get("flow_intertime_avg").toString+","+info.get("flow_intertime_stddev").toString+")")
             
      if(score>0)
@@ -485,8 +513,8 @@ object HogDNS {
     println("######################################################################################")           
  
     // Taint the dirty side, generating HogEvents
-    /* */
-
+*/
+     
   }
   
 }
