@@ -1,12 +1,9 @@
-package org.hogzilla.util
+package org.hogzilla.histogram
 
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.Map
 import scala.collection.mutable.Set
 import scala.math.log
-
-import org.hogzilla.histogram.HogHistogram
-import org.hogzilla.histogram.HogHistogram
 
 
 /**

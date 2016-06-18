@@ -27,8 +27,6 @@ package org.hogzilla.sflow
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.Map
-import scala.math.random
-
 import org.apache.hadoop.hbase.client.Scan
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark._
@@ -41,8 +39,9 @@ import org.hogzilla.event.HogSignature
 import org.hogzilla.hbase.HogHBaseHistogram
 import org.hogzilla.hbase.HogHBaseRDD
 import org.hogzilla.histogram.HogHistogram
-import org.hogzilla.util.Histograms
 import org.hogzilla.util.HogFlow
+import org.hogzilla.histogram.Histograms
+import scala.math._
 
 /**
  * 
@@ -230,7 +229,7 @@ object HogSFlow {
           
       
    val g3: PairRDDFunctions[String, (Map[String,Double], Long)] 
-                      = SflowRDD.filter { flow => flow.map.get("flow:tcpFlags").get.equals("0x12") }
+            = SflowRDD.filter { flow => flow.map.get("flow:tcpFlags").get.equals("0x12") }
                       .filter(flow => {  myNets.map { net =>
                                                          if( flow.map.get("flow:srcIP").get.startsWith(net) )
                                                           { true } else{false} 
@@ -239,9 +238,7 @@ object HogSFlow {
                                val map:Map[String,Double]=new HashMap[String,Double]
                                map.put(flow.map.get("flow:srcPort").get, 1D)                        
                        
-                               (flow.map.get("flow:srcIP").get,
-                                 (map,1L)
-                               ) 
+                               (flow.map.get("flow:srcIP").get,  (map,1L)  ) 
                            }
             
    //println("Filtered RDD: "+g3.countByKey())
@@ -254,10 +251,10 @@ object HogSFlow {
                       (map1,qtd1+qtd2)
                  }
     .map({ case (srcIP,(map,qtd)) =>
-                            (srcIP,(map.map({ case (qtdString,qtdC) => (qtdString,qtdC/qtd.toDouble) }),qtd))
+                            (srcIP,(map.map({ case (port,qtdC) => (port,qtdC/qtd.toDouble) }),qtd))
          })
          
-    println("Mapped RDD: "+g3b.count())
+    println("Mapped RDD1: "+g3b.count())
    
     g3b.foreach{case (srcIP,(map,qtd)) => 
                     
@@ -295,7 +292,7 @@ object HogSFlow {
                     			//println("ATypical: "+atypical)
                     			if(atypical.size > 0)
                     			{
-                            println("IP: "+srcIP+ "  (N:"+qtd+",S:"+hogHistogram.histSize+") - Atypical ports: "+atypical)
+                            println("Source IP: "+srcIP+ "  (N:"+qtd+",S:"+hogHistogram.histSize+") - Atypical (open) source ports: "+atypical)
                             /*
                     				println("Saved:")
                     				hogHistogram.histMap./:(0){case  (c,(key,qtd))=>
@@ -333,14 +330,12 @@ object HogSFlow {
                       .filter(flow => {  myNets.map { net =>
                                                          if( flow.map.get("flow:dstIP").get.startsWith(net) )
                                                           { true } else{false} 
-                                                    }.contains(true) && (flow.map.get("flow:srcPort").get.toLong < 10000)
+                                                    }.contains(true) & (flow.map.get("flow:srcPort").get.toLong < 10000)
                       }).map { flow => 
                                val map:Map[String,Double]=new HashMap[String,Double]
                                map.put(flow.map.get("flow:srcPort").get, 1D)                        
                        
-                               (flow.map.get("flow:dstIP").get,
-                                 (map,1L)
-                               ) 
+                               (flow.map.get("flow:dstIP").get, (map,1L) ) 
                            }
             
    //println("Filtered RDD: "+g3.countByKey())
@@ -353,7 +348,7 @@ object HogSFlow {
                       (map1,qtd1+qtd2)
                  }
     .map({ case (dstIP,(map,qtd)) =>
-                            (dstIP,(map.map({ case (qtdString,qtdC) => (qtdString,qtdC/qtd.toDouble) }),qtd))
+                            (dstIP,(map.map({ case (port,qtdC) => (port,qtdC/qtd.toDouble) }),qtd))
          })
          
     println("Mapped RDD2: "+g4b.count())
@@ -375,10 +370,11 @@ object HogSFlow {
                           //val KBDistance = Histograms.KullbackLiebler(hogHistogram.histMap, map)
                           val atypical   = Histograms.atypical(hogHistogram.histMap, map)
 
-                          
                           if(atypical.size>0 )
                           {
-                            println("IP: "+dstIP+ "  (N:"+qtd+",S:"+hogHistogram.histSize+") - Atypical ports: "+atypical)
+                            
+                             println("Destination IP: "+dstIP+ "  (N:"+qtd+",S:"+hogHistogram.histSize+") - Atypical source ports: "+atypical)
+                            
                             /*
                             println("Saved:")
                             hogHistogram.histMap./:(0){case  (c,(key,qtd))=>
@@ -403,9 +399,202 @@ object HogSFlow {
     
     
     
+      
+    /*
+  * 
+  * Port Hist 3
+  * 
+  */
+  
+
+    
+    
+  println("")
+  println("Port histograms 03")
+          
+      //.filter { flow => flow.map.get("flow:tcpFlags").get.equals("0x12") }
+   val g5: PairRDDFunctions[(String,String), Long] 
+                      = SflowRDD.map ({ flow => 
+                                
+                               if(myNets.map { net =>  if( flow.map.get("flow:srcIP").get.startsWith(net) )
+                                                          { true } else{false} 
+                                              }.contains(true))
+                               {
+                                   ((flow.map.get("flow:srcIP").get,flow.map.get("flow:dstIP").get), 1L )
+                               }else
+                               {
+                                   ((flow.map.get("flow:dstIP").get,flow.map.get("flow:srcIP").get), 1L )
+                               } 
+                           })
+            
+   //println("Filtered RDD: "+g3.countByKey())
+   
+   val g5b = g5.reduceByKey({ case (qtda,qtdb) => 0L})
+                                              .map({case ((myIP,alienIP),qtd) => (myIP,1L)})
+                                              .countByKey()
+                                              //.reduceByKey({ case (qtda,qtdb) => qtda+qtdb})
+     
+    g5b.foreach{case (myIP,qtdCon) => 
+                    
+                    val hogHistogram=HogHBaseHistogram.getHistogram("HIST03-"+myIP)
+                    
+                    val map = new HashMap[String,Double]
+                    val key = floor(log(qtdCon.*(1000))).toString
+                    map.put(key, 1D)
+                    
+                    if(hogHistogram.histSize< 20)
+                    {
+                      // Learn more!
+                      println("MyIP: "+myIP+ "  (N:1,S:"+hogHistogram.histSize+") - Learn More!")
+                      HogHBaseHistogram.saveHistogram(Histograms.merge(hogHistogram, new HogHistogram("",1L,map)))
+
+                    }else
+                    {
+
+                          //val KBDistance = Histograms.KullbackLiebler(hogHistogram.histMap, map)
+                          val atypical   = Histograms.atypical(hogHistogram.histMap, map)
+
+                           
+                          if(atypical.size>0 )
+                          {
+                            println("MyIP: "+myIP+ "  (N:1,S:"+hogHistogram.histSize+") - Atypical number of pairs in the period: "+qtdCon)
+                           
+                            /*
+                            println("Saved:")
+                            hogHistogram.histMap./:(0){case  (c,(key,qtd))=>
+                            println(key+": "+ qtd)
+                            0
+                            } 
+                            println("Now:")
+                            map./:(0){case  (c,(key,qtd))=>
+                            println(key+": "+ qtd)
+                            0
+                            } 
+                            * 
+                            */
+                          }
+                      HogHBaseHistogram.saveHistogram(Histograms.merge(hogHistogram, new HogHistogram("",1L,map)))
+
+                    }
+                    
+             }
     
     
     
+       
+    /*
+  * 
+  * Port  4
+  * 
+  */
+  
+
+    
+    
+  println("")
+  println("Port histograms 04")
+          
+      //.filter { flow => flow.map.get("flow:tcpFlags").get.equals("0x12") }
+   val g6: PairRDDFunctions[(String,String), Long] 
+                      = SflowRDD.map ({ flow => 
+                                
+                               if(myNets.map { net =>  if( flow.map.get("flow:srcIP").get.startsWith(net) )
+                                                          { true } else{false} 
+                                              }.contains(true))
+                               {
+                                   ((flow.map.get("flow:srcIP").get,flow.map.get("flow:dstIP").get), flow.map.get("flow:packetSize").get.toLong )
+                               }else
+                               {
+                                   ((flow.map.get("flow:dstIP").get,flow.map.get("flow:srcIP").get), flow.map.get("flow:packetSize").get.toLong  )
+                               } 
+                           })
+            
+   //println("Filtered RDD: "+g3.countByKey())
+   
+   val g6b = g6.reduceByKey({ case (sizea,sizeb) => sizea+sizeb})
+                                              .map({case ((myIP,alienIP),size) => (myIP,size)})
+                                              .reduceByKey({ case (sizea,sizeb) => sizea+sizeb})
+     
+    g6b.foreach{case (myIP,bytes) => 
+                    
+                    val hogHistogram=HogHBaseHistogram.getHistogram("HIST04-"+myIP)
+                    
+                    val map = new HashMap[String,Double]
+                    val key = floor(log(bytes.*(0.0001))).toString
+                    map.put(key, 1D)
+                    
+                    if(hogHistogram.histSize< 20)
+                    {
+                      // Learn more!
+                      println("MyIP: "+myIP+ "  (N:1,S:"+hogHistogram.histSize+") - Learn More!")
+                      HogHBaseHistogram.saveHistogram(Histograms.merge(hogHistogram, new HogHistogram("",1L,map)))
+
+                    }else
+                    {
+
+                          //val KBDistance = Histograms.KullbackLiebler(hogHistogram.histMap, map)
+                          val atypical   = Histograms.atypical(hogHistogram.histMap, map)
+
+                          
+                          if(atypical.size>0 )
+                          {
+                             println("MyIP: "+myIP+ "  (N:1,S:"+hogHistogram.histSize+") - Atypical amount of transfered bytes: "+bytes)
+                            
+                            /*
+                            println("Saved:")
+                            hogHistogram.histMap./:(0){case  (c,(key,qtd))=>
+                            println(key+": "+ qtd)
+                            0
+                            } 
+                            println("Now:")
+                            map./:(0){case  (c,(key,qtd))=>
+                            println(key+": "+ qtd)
+                            0
+                            } 
+                            * 
+                            */
+                          }
+                      HogHBaseHistogram.saveHistogram(Histograms.merge(hogHistogram, new HogHistogram("",1L,map)))
+
+                    }
+                    
+             }
+    
+    
+ 
+    
+  println("")
+  val alienThreshold = 2
+  println("Aliens accessing more than "+alienThreshold+" hosts")
+          
+      //
+   val g7: PairRDDFunctions[(String,String), Long] 
+                      = SflowRDD.filter { flow => flow.map.get("flow:tcpFlags").get.equals("0x02") &
+                                                  !myNets.map { net =>  if( flow.map.get("flow:srcIP").get.startsWith(net) )
+                                                                             { true } else{false} 
+                                                              }.contains(true)
+                                        }
+                           .map ({ flow => 
+                               ((flow.map.get("flow:srcIP").get,flow.map.get("flow:dstIP").get), 1L )
+                           })
+            
+   //println("Filtered RDD: "+g3.countByKey())
+   
+   val g7b = g7.reduceByKey({ case (qtda,qtdb) => 0L})
+                                              .map({case ((alienIP,myIP),qtd) => (alienIP,1L)})
+                                              .countByKey()
+                                              //.reduceByKey({ case (qtda,qtdb) => qtda+qtdb})
+     
+    g7b.foreach{case (alienIP,qtdCon) => 
+                    if(qtdCon > alienThreshold)
+                    {                     
+                      println("AlienIP: "+alienIP+ " more than "+alienThreshold+" pairs in the period: "+qtdCon)
+                    }
+                }
+               
+    
+    
+       
   
     /*
      * 
