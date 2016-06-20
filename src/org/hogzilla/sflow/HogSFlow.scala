@@ -24,24 +24,29 @@
 
 package org.hogzilla.sflow
 
+import java.net.InetAddress
+
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.Map
+import scala.math.floor
+import scala.math.log
+
 import org.apache.hadoop.hbase.client.Scan
 import org.apache.hadoop.hbase.util.Bytes
-import org.apache.spark._
-import org.apache.spark.mllib.linalg.Vector
-import org.apache.spark.mllib.optimization.L1Updater
+import org.apache.spark.SparkContext
 import org.apache.spark.rdd.PairRDDFunctions
 import org.apache.spark.rdd.RDD
+import org.apache.spark.rdd.RDD.rddToPairRDDFunctions
 import org.hogzilla.event.HogEvent
 import org.hogzilla.event.HogSignature
 import org.hogzilla.hbase.HogHBaseHistogram
 import org.hogzilla.hbase.HogHBaseRDD
+import org.hogzilla.hbase.HogHBaseReputation
+import org.hogzilla.histogram.Histograms
 import org.hogzilla.histogram.HogHistogram
 import org.hogzilla.util.HogFlow
-import org.hogzilla.histogram.Histograms
-import scala.math._
+
 
 /**
  * 
@@ -49,7 +54,12 @@ import scala.math._
 object HogSFlow {
 
   val signature = (HogSignature(3,"HZ: Top talker identified" ,2,1,826001001,826).saveHBase(),
-                   HogSignature(3,"HZ: SMTP talker identified",2,1,826001002,826).saveHBase())
+                   HogSignature(3,"HZ: SMTP talker identified",2,1,826001002,826).saveHBase(),
+                   HogSignature(3,"HZ: Atypical TCP port used",2,1,826001003,826).saveHBase(),
+                   HogSignature(3,"HZ: Atypical alien TCP port used",2,1,826001004,826).saveHBase(),
+                   HogSignature(3,"HZ: Atypical number of pairs in the period",2,1,826001005,826).saveHBase(),
+                   HogSignature(3,"HZ: Atypical amount of data transfered",2,1,826001006,826).saveHBase(),
+                   HogSignature(3,"HZ: Alien accessing too much hosts",2,1,826001007,826).saveHBase())
       
   
   /**
@@ -60,7 +70,7 @@ object HogSFlow {
   def run(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)],spark:SparkContext)
   {
     
-   // TopTalkers, SMTP Talkers, XXX
+   // TopTalkers, SMTP Talkers, XXX: Organize it!
    top(HogRDD)
  
   }
@@ -71,9 +81,10 @@ object HogSFlow {
   {
     val hostname:String = event.data.get("hostname")
     val bytes:String = event.data.get("bytes")
+    val threshold:String = event.data.get("threshold")
     
-    event.text = "This IP was detected by Hogzilla as an abnormal activity. In what follows, you can see more information.\n"+
-                  "Abnormal behaviour: Large amount of sent data\n"+
+    event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
+                  "Abnormal behaviour: Large amount of sent data (>"+threshold+")\n"+
                   "IP: "+hostname+"\n"+
                   "Bytes: "+bytes+"\n"
   
@@ -87,13 +98,84 @@ object HogSFlow {
     val dst:String = event.data.get("dst")
     val bytes:String = event.data.get("bytes")
     
-    event.text = "This IP was detected by Hogzilla as an abnormal activity. In what follows, you can see more information.\n"+
+    event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
                   "Abnormal behaviour: SMTP communication\n"+
                   " "+src+" <-> "+dst+"  ("+bytes+" bytes)\n"
                   
     event.signature_id = signature._2.signature_id       
     event
   }
+  
+  
+  def populateAtypicalTCPPortUsed(event:HogEvent):HogEvent =
+  {
+    val src:String = event.data.get("src")
+    val tcpport:String = event.data.get("tcpport")
+    
+    event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
+                  "Abnormal behaviour: Atypical TCP port used ("+tcpport+")\n"+
+                  " "+src+":"+tcpport+" <-> Alien or Host  \n"
+                  
+    event.signature_id = signature._3.signature_id       
+    event
+  }
+  
+  def populateAtypicalAlienTCPPortUsed(event:HogEvent):HogEvent =
+  {
+    val dst:String = event.data.get("dst")
+    val tcpport:String = event.data.get("tcpport")
+    
+    event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
+                  "Abnormal behaviour: Atypical alien TCP port used ("+tcpport+")\n"+
+                  " "+dst+" <-> Alien_or_Host:"+tcpport+"  \n"
+                  
+    event.signature_id = signature._4.signature_id       
+    event
+  }
+  
+  
+  
+  def populateAtypicalNumberOfPairs(event:HogEvent):HogEvent =
+  {
+    val dst:String = event.data.get("dst")
+    val numberOfPairs:String = event.data.get("numberOfPairs")
+    
+    event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
+                  "Abnormal behaviour: Atypical number of pairs in the period ("+numberOfPairs+")\n"+
+                  " "+dst+" <-> "+numberOfPairs+" distincts other hosts  \n"
+                  
+    event.signature_id = signature._5.signature_id       
+    event
+  }
+                          
+  def populateAtypicalAmountData(event:HogEvent):HogEvent =
+  {
+    val src:String = event.data.get("src")
+    val bytes:String = event.data.get("bytes")
+    
+    event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
+                  "Abnormal behaviour: Atypical amount of data transfered ("+bytes+" bytes)\n"+
+                  " "+src+" <-> other hosts ("+bytes+" bytes)  \n"
+                  
+    event.signature_id = signature._6.signature_id       
+    event
+  }  
+  
+  
+  def populateAlienAccessingManyHosts(event:HogEvent):HogEvent =
+  {
+    val src:String = event.data.get("src")
+    val numberOfPairs:String = event.data.get("numberOfPairs")
+    
+    event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
+                  "Abnormal behaviour: Alien accessing too much hosts ("+numberOfPairs+")\n"+
+                  " "+src+" <-> "+numberOfPairs+" distinct hosts \n"
+                  
+    event.signature_id = signature._7.signature_id       
+    event
+  }  
+  
+  
   
   
   /**
@@ -144,27 +226,26 @@ object HogSFlow {
   * 
   */
     
-/* ======================================================================================    
   val whiteTopTalkers = HogHBaseReputation.getReputationList("TTalker","whitelist")
-  
+  val topTalkersThreshold:Long = 21474836480L // (20*1024*1024*1024 = 20G)
   
   println("")
   println("Top Talkers (bytes):")
   println("(LowerIP <-> UpperIP, Bytes)")
   val g1: PairRDDFunctions[String, Long] = 
-    SflowRDD.map( hogflow => (Bytes.toString(hogflow.lower_ip),hogflow.map.get("flow:packetSize").toLong) )
+    SflowRDD.map( hogflow => (Bytes.toString(hogflow.lower_ip),hogflow.map.get("flow:packetSize").get.toLong) )
   
   g1.reduceByKey(_+_).sortBy(_._2, false, 10)
     .filter(tp => {  myNets.map { net => if( tp._1.startsWith(net) )
                                             { true } else{false} 
-                                    }.contains(true)
+                                    }.contains(true) & (tp._2 > topTalkersThreshold )
           })
     .take(2000+whiteTopTalkers.size)
     .filter(tp => {  !whiteTopTalkers.map { net => if( tp._1.startsWith(net) )
                                             { true } else{false} 
-                                    }.contains(true)
+                                    }.contains(true) 
           })
-    .take(30)
+    .take(10)
     .foreach{ case (talker,bytes) => 
                     println("("+talker+","+bytes+")" ) 
                     val flowMap: Map[String,String] = new HashMap[String,String]
@@ -173,11 +254,11 @@ object HogSFlow {
                                                                  InetAddress.getByName("1.1.1.1").getAddress))
                     event.data.put("hostname", talker)
                     event.data.put("bytes", bytes.toString)
+                    event.data.put("threshold", topTalkersThreshold.toString)
                     populateTopTalker(event).alert()
              }
   
   
-================================================================================================ */
     
  /*
   * 
@@ -185,7 +266,6 @@ object HogSFlow {
   * 
   */
     
-/* ======================================================================================    
   
   val whiteSMTPTalkers =  HogHBaseReputation.getReputationList("MX","whitelist")
 
@@ -196,7 +276,7 @@ object HogSFlow {
            = SflowRDD.filter { flow => flow.map.get("flow:dstPort").equals("25") || flow.map.get("flow:srcPort").equals("25") }
                      .map { hogflow => 
                                ((Bytes.toString(hogflow.lower_ip),Bytes.toString(hogflow.upper_ip)),
-                                (hogflow.map.get("flow:packetSize").toLong,1L)) 
+                                (hogflow.map.get("flow:packetSize").get.toLong,1L)) 
                            }
   g2.reduceByKey{case ((a1,b1),(a2,b2)) => (a1+a2,b1+b2)}
     .sortBy({case ((src,dst),(bytes,qtFlows)) => bytes} , false, 10)
@@ -214,18 +294,19 @@ object HogSFlow {
                     populateSMTPTalker(event).alert()
              }
              
-  ================================================================================================ */
   
  
  /*
   * 
-  * Port Hist
+  * Port Histogram - Atypical TCP port used
+  * 
+  * 
   * 
   */
   
 
   println("")
-  println("Port histograms 01")
+  println("Atypical TCP port used")
           
       
    val g3: PairRDDFunctions[String, (Map[String,Double], Long)] 
@@ -264,7 +345,7 @@ object HogSFlow {
                     if(hogHistogram.histSize< 1000)
                     {
                       // Learn more!
-                      println("IP: "+srcIP+ "  (N:"+qtd+",S:"+hogHistogram.histSize+") - Learn More!")
+                      //println("IP: "+srcIP+ "  (N:"+qtd+",S:"+hogHistogram.histSize+") - Learn More!")
                       HogHBaseHistogram.saveHistogram(Histograms.merge(hogHistogram, new HogHistogram("",qtd,map)))
 
                     }else
@@ -273,26 +354,11 @@ object HogSFlow {
                     	    //val KBDistance = Histograms.KullbackLiebler(hogHistogram.histMap, map)
                     			val atypical   = Histograms.atypical(hogHistogram.histMap, map)
                           
-                          if(srcIP.equals("10.1.101.101xxx"))
-                          {
-                            println("IP: "+srcIP+ "  (N:"+qtd+",S:"+hogHistogram.histSize+") - Atypical ports: "+atypical)
-                              println("Saved:")
-                            hogHistogram.histMap./:(0){case  (c,(key,qtd))=>
-                            println(key+": "+ qtd)
-                            0
-                            } 
-                            println("Now:")
-                            map./:(0){case  (c,(key,qtd))=>
-                            println(key+": "+ qtd)
-                            0
-                            }
-                          }
-
                     			//println("KB: "+KBDistance)
                     			//println("ATypical: "+atypical)
                     			if(atypical.size > 0)
                     			{
-                            println("Source IP: "+srcIP+ "  (N:"+qtd+",S:"+hogHistogram.histSize+") - Atypical (open) source ports: "+atypical)
+                            println("Source IP: "+srcIP+ "  (N:"+qtd+",S:"+hogHistogram.histSize+") - Atypical (open) source ports: "+atypical.mkString(","))
                             /*
                     				println("Saved:")
                     				hogHistogram.histMap./:(0){case  (c,(key,qtd))=>
@@ -305,6 +371,14 @@ object HogSFlow {
                     				0
                     				} 
                             */
+                            
+                            val flowMap: Map[String,String] = new HashMap[String,String]
+                            flowMap.put("flow:id",srcIP+atypical.take(1)+System.currentTimeMillis)
+                            val event = new HogEvent(new HogFlow(flowMap,InetAddress.getByName(srcIP).getAddress,
+                                                                         InetAddress.getByName("1.1.1.1").getAddress))
+                            event.data.put("src", srcIP)
+                            event.data.put("tcpport", atypical.mkString(","))
+                            populateAtypicalTCPPortUsed(event).alert()
                     			}
                           
                           HogHBaseHistogram.saveHistogram(Histograms.merge(hogHistogram, new HogHistogram("",qtd,map)))
@@ -314,15 +388,16 @@ object HogSFlow {
     
     
     
-    /*
+ /*
   * 
-  * Port Hist
+  * Port Histogram - Atypical alien TCP port used
+  * 
   * 
   */
   
 
   println("")
-  println("Port histograms 02")
+  println("Atypical alien TCP port used")
           
       //.filter { flow => flow.map.get("flow:tcpFlags").get.equals("0x12") }
    val g4: PairRDDFunctions[String, (Map[String,Double], Long)] 
@@ -361,7 +436,7 @@ object HogSFlow {
                     if(hogHistogram.histSize< 1000)
                     {
                       // Learn more!
-                      println("IP: "+dstIP+ "  (N:"+qtd+",S:"+hogHistogram.histSize+") - Learn More!")
+                      //println("IP: "+dstIP+ "  (N:"+qtd+",S:"+hogHistogram.histSize+") - Learn More!")
                       HogHBaseHistogram.saveHistogram(Histograms.merge(hogHistogram, new HogHistogram("",qtd,map)))
 
                     }else
@@ -373,7 +448,7 @@ object HogSFlow {
                           if(atypical.size>0 )
                           {
                             
-                             println("Destination IP: "+dstIP+ "  (N:"+qtd+",S:"+hogHistogram.histSize+") - Atypical source ports: "+atypical)
+                             println("Destination IP: "+dstIP+ "  (N:"+qtd+",S:"+hogHistogram.histSize+") - Atypical source ports: "+atypical.mkString(","))
                             
                             /*
                             println("Saved:")
@@ -388,6 +463,14 @@ object HogSFlow {
                             } 
                             * 
                             */
+                            
+                            val flowMap: Map[String,String] = new HashMap[String,String]
+                            flowMap.put("flow:id",dstIP+atypical.take(1).toString()+System.currentTimeMillis)
+                            val event = new HogEvent(new HogFlow(flowMap,InetAddress.getByName(dstIP).getAddress,
+                                                                         InetAddress.getByName("1.1.1.1").getAddress))
+                            event.data.put("dst", dstIP)
+                            event.data.put("tcpport", atypical.mkString(","))
+                            populateAtypicalAlienTCPPortUsed(event).alert()
                           }
                       HogHBaseHistogram.saveHistogram(Histograms.merge(hogHistogram, new HogHistogram("",qtd,map)))
 
@@ -400,17 +483,16 @@ object HogSFlow {
     
     
       
-    /*
+ /*
   * 
-  * Port Hist 3
+  * Atypical number of pairs in the period
+  * 
   * 
   */
-  
-
     
     
   println("")
-  println("Port histograms 03")
+  println("Atypical number of pairs in the period")
           
       //.filter { flow => flow.map.get("flow:tcpFlags").get.equals("0x12") }
    val g5: PairRDDFunctions[(String,String), Long] 
@@ -445,7 +527,7 @@ object HogSFlow {
                     if(hogHistogram.histSize< 20)
                     {
                       // Learn more!
-                      println("MyIP: "+myIP+ "  (N:1,S:"+hogHistogram.histSize+") - Learn More!")
+                      //println("MyIP: "+myIP+ "  (N:1,S:"+hogHistogram.histSize+") - Learn More!")
                       HogHBaseHistogram.saveHistogram(Histograms.merge(hogHistogram, new HogHistogram("",1L,map)))
 
                     }else
@@ -472,6 +554,14 @@ object HogSFlow {
                             } 
                             * 
                             */
+                            
+                            val flowMap: Map[String,String] = new HashMap[String,String]
+                            flowMap.put("flow:id",myIP+qtdCon+System.currentTimeMillis)
+                            val event = new HogEvent(new HogFlow(flowMap,InetAddress.getByName(myIP).getAddress,
+                                                                         InetAddress.getByName("1.1.1.1").getAddress))
+                            event.data.put("dst", myIP)
+                            event.data.put("numberOfPairs",qtdCon.toString)
+                            populateAtypicalNumberOfPairs(event).alert()
                           }
                       HogHBaseHistogram.saveHistogram(Histograms.merge(hogHistogram, new HogHistogram("",1L,map)))
 
@@ -480,19 +570,16 @@ object HogSFlow {
              }
     
     
-    
        
-    /*
+ /*
   * 
-  * Port  4
+  * Atypical amount of data transfered
   * 
   */
   
-
-    
     
   println("")
-  println("Port histograms 04")
+  println("Atypical amount of data transfered")
           
       //.filter { flow => flow.map.get("flow:tcpFlags").get.equals("0x12") }
    val g6: PairRDDFunctions[(String,String), Long] 
@@ -526,7 +613,7 @@ object HogSFlow {
                     if(hogHistogram.histSize< 20)
                     {
                       // Learn more!
-                      println("MyIP: "+myIP+ "  (N:1,S:"+hogHistogram.histSize+") - Learn More!")
+                      //println("MyIP: "+myIP+ "  (N:1,S:"+hogHistogram.histSize+") - Learn More!")
                       HogHBaseHistogram.saveHistogram(Histograms.merge(hogHistogram, new HogHistogram("",1L,map)))
 
                     }else
@@ -553,6 +640,14 @@ object HogSFlow {
                             } 
                             * 
                             */
+                            
+                            val flowMap: Map[String,String] = new HashMap[String,String]
+                            flowMap.put("flow:id",myIP+bytes+System.currentTimeMillis)
+                            val event = new HogEvent(new HogFlow(flowMap,InetAddress.getByName(myIP).getAddress,
+                                                                         InetAddress.getByName("1.1.1.1").getAddress))
+                            event.data.put("src", myIP)
+                            event.data.put("tcpport", bytes.toString())
+                            populateAtypicalAmountData(event).alert()
                           }
                       HogHBaseHistogram.saveHistogram(Histograms.merge(hogHistogram, new HogHistogram("",1L,map)))
 
@@ -561,7 +656,13 @@ object HogSFlow {
              }
     
     
- 
+       
+ /*
+  * 
+  * Alien accessing too much hosts
+  * 
+  */
+  
     
   println("")
   val alienThreshold = 2
@@ -586,9 +687,17 @@ object HogSFlow {
                                               //.reduceByKey({ case (qtda,qtdb) => qtda+qtdb})
      
     g7b.foreach{case (alienIP,qtdCon) => 
-                    if(qtdCon > alienThreshold)
+                    if(qtdCon > alienThreshold & !alienIP.equals("0.0.0.0") )
                     {                     
-                      println("AlienIP: "+alienIP+ " more than "+alienThreshold+" pairs in the period: "+qtdCon)
+                            println("AlienIP: "+alienIP+ " more than "+alienThreshold+" pairs in the period: "+qtdCon)
+                         
+                            val flowMap: Map[String,String] = new HashMap[String,String]
+                            flowMap.put("flow:id",alienIP+qtdCon+System.currentTimeMillis)
+                            val event = new HogEvent(new HogFlow(flowMap,InetAddress.getByName(alienIP).getAddress,
+                                                                         InetAddress.getByName("1.1.1.1").getAddress))
+                            event.data.put("src", alienIP)
+                            event.data.put("numberOfPairs", qtdCon.toString())
+                            populateAlienAccessingManyHosts(event).alert()
                     }
                 }
                
