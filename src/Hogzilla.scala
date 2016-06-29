@@ -23,6 +23,8 @@ import org.hogzilla.hbase.HogHBaseRDD
 import org.hogzilla.initiate.HogInitiate
 import org.hogzilla.prepare.HogPrepare
 import org.hogzilla.sflow.HogSFlow
+import org.hogzilla.http.HogHTTP
+import org.hogzilla.dns.HogDNS
 
 /**
  * 
@@ -51,10 +53,10 @@ object Hogzilla {
     HogPrepare.prepare(HogRDD)
     
     // Run algorithms for DNS protocol
-    //HogDNS.run(HogRDD,spark);
+    HogDNS.run(HogRDD,spark);
     
     // Run algorithms for HTTP protocol
-    //HogHTTP.run(HogRDD,spark);
+    HogHTTP.run(HogRDD,spark);
     
     // Run algorithms for SMTP protocol
     //HogSMTP.run(HogRDD);

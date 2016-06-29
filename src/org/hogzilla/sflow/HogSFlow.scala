@@ -54,12 +54,12 @@ import org.hogzilla.util.HogFlow
 object HogSFlow {
 
   val signature = (HogSignature(3,"HZ: Top talker identified" ,2,1,826001001,826).saveHBase(),
-                   HogSignature(3,"HZ: SMTP talker identified",2,1,826001002,826).saveHBase(),
+                   HogSignature(3,"HZ: SMTP talker identified",1,1,826001002,826).saveHBase(),
                    HogSignature(3,"HZ: Atypical TCP port used",2,1,826001003,826).saveHBase(),
                    HogSignature(3,"HZ: Atypical alien TCP port used",2,1,826001004,826).saveHBase(),
                    HogSignature(3,"HZ: Atypical number of pairs in the period",2,1,826001005,826).saveHBase(),
                    HogSignature(3,"HZ: Atypical amount of data transfered",2,1,826001006,826).saveHBase(),
-                   HogSignature(3,"HZ: Alien accessing too much hosts",2,1,826001007,826).saveHBase())
+                   HogSignature(3,"HZ: Alien accessing too much hosts",3,1,826001007,826).saveHBase())
       
   
   /**
@@ -249,9 +249,9 @@ object HogSFlow {
     .foreach{ case (talker,bytes) => 
                     println("("+talker+","+bytes+")" ) 
                     val flowMap: Map[String,String] = new HashMap[String,String]
-                    flowMap.put("flow:id",talker+System.currentTimeMillis)
+                    flowMap.put("flow:id",System.currentTimeMillis.toString)
                     val event = new HogEvent(new HogFlow(flowMap,InetAddress.getByName(talker).getAddress,
-                                                                 InetAddress.getByName("1.1.1.1").getAddress))
+                                                                 InetAddress.getByName("255.255.255.255").getAddress))
                     event.data.put("hostname", talker)
                     event.data.put("bytes", bytes.toString)
                     event.data.put("threshold", topTalkersThreshold.toString)
@@ -285,7 +285,7 @@ object HogSFlow {
     .take(30)
     .foreach{case ((src,dst),(bytes,qtFlows)) => println("("+src+","+dst+","+bytes+","+qtFlows+")")
                     val flowMap: Map[String,String] = new HashMap[String,String]
-                    flowMap.put("flow:id",src+dst+System.currentTimeMillis)
+                    flowMap.put("flow:id",System.currentTimeMillis.toString)
                     val event = new HogEvent(new HogFlow(flowMap,InetAddress.getByName(src).getAddress,
                                                                  InetAddress.getByName(dst).getAddress))
                     event.data.put("src", src)
@@ -373,9 +373,9 @@ object HogSFlow {
                             */
                             
                             val flowMap: Map[String,String] = new HashMap[String,String]
-                            flowMap.put("flow:id",srcIP+atypical.take(1)+System.currentTimeMillis)
+                            flowMap.put("flow:id",System.currentTimeMillis.toString)
                             val event = new HogEvent(new HogFlow(flowMap,InetAddress.getByName(srcIP).getAddress,
-                                                                         InetAddress.getByName("1.1.1.1").getAddress))
+                                                                         InetAddress.getByName("255.255.255.255").getAddress))
                             event.data.put("src", srcIP)
                             event.data.put("tcpport", atypical.mkString(","))
                             populateAtypicalTCPPortUsed(event).alert()
@@ -465,9 +465,9 @@ object HogSFlow {
                             */
                             
                             val flowMap: Map[String,String] = new HashMap[String,String]
-                            flowMap.put("flow:id",dstIP+atypical.take(1).toString()+System.currentTimeMillis)
+                            flowMap.put("flow:id",System.currentTimeMillis.toString)
                             val event = new HogEvent(new HogFlow(flowMap,InetAddress.getByName(dstIP).getAddress,
-                                                                         InetAddress.getByName("1.1.1.1").getAddress))
+                                                                         InetAddress.getByName("255.255.255.255").getAddress))
                             event.data.put("dst", dstIP)
                             event.data.put("tcpport", atypical.mkString(","))
                             populateAtypicalAlienTCPPortUsed(event).alert()
@@ -556,9 +556,9 @@ object HogSFlow {
                             */
                             
                             val flowMap: Map[String,String] = new HashMap[String,String]
-                            flowMap.put("flow:id",myIP+qtdCon+System.currentTimeMillis)
+                            flowMap.put("flow:id",System.currentTimeMillis.toString)
                             val event = new HogEvent(new HogFlow(flowMap,InetAddress.getByName(myIP).getAddress,
-                                                                         InetAddress.getByName("1.1.1.1").getAddress))
+                                                                         InetAddress.getByName("255.255.255.255").getAddress))
                             event.data.put("dst", myIP)
                             event.data.put("numberOfPairs",qtdCon.toString)
                             populateAtypicalNumberOfPairs(event).alert()
@@ -642,9 +642,9 @@ object HogSFlow {
                             */
                             
                             val flowMap: Map[String,String] = new HashMap[String,String]
-                            flowMap.put("flow:id",myIP+bytes+System.currentTimeMillis)
+                            flowMap.put("flow:id",System.currentTimeMillis.toString)
                             val event = new HogEvent(new HogFlow(flowMap,InetAddress.getByName(myIP).getAddress,
-                                                                         InetAddress.getByName("1.1.1.1").getAddress))
+                                                                         InetAddress.getByName("255.255.255.255").getAddress))
                             event.data.put("src", myIP)
                             event.data.put("tcpport", bytes.toString())
                             populateAtypicalAmountData(event).alert()
@@ -692,9 +692,9 @@ object HogSFlow {
                             println("AlienIP: "+alienIP+ " more than "+alienThreshold+" pairs in the period: "+qtdCon)
                          
                             val flowMap: Map[String,String] = new HashMap[String,String]
-                            flowMap.put("flow:id",alienIP+qtdCon+System.currentTimeMillis)
+                            flowMap.put("flow:id",System.currentTimeMillis.toString)
                             val event = new HogEvent(new HogFlow(flowMap,InetAddress.getByName(alienIP).getAddress,
-                                                                         InetAddress.getByName("1.1.1.1").getAddress))
+                                                                         InetAddress.getByName("255.255.255.255").getAddress))
                             event.data.put("src", alienIP)
                             event.data.put("numberOfPairs", qtdCon.toString())
                             populateAlienAccessingManyHosts(event).alert()
@@ -708,7 +708,7 @@ object HogSFlow {
     /*
      * 
                     val flowMap: Map[String,String] = new HashMap[String,String]
-                    flowMap.put("flow:id",src+dst+System.currentTimeMillis)
+                    flowMap.put("flow:id",System.currentTimeMillis.toString)
                     val event = new HogEvent(new HogFlow(flowMap,InetAddress.getByName(src).getAddress,
                                                                  InetAddress.getByName(dst).getAddress))
                     event.data.put("src", src)

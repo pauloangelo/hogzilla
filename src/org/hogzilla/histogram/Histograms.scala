@@ -38,13 +38,15 @@ object Histograms {
   {
     
     val ret = new HashSet[String] 
+    
+    val atypicalThreshold = 0.0001D
         
     val keys = histogram2.keySet
     
     keys./:(0.0){ case (ac,key) =>
                   val p:Double = { if(histogram1.get(key).isEmpty) 0 else histogram1.get(key).get }
                   val q:Double = { if(histogram2.get(key).isEmpty) 0 else histogram2.get(key).get }
-                  if(p==0 && q>0)
+                  if(p<atypicalThreshold && q>atypicalThreshold)
                   {
                    ret.add(key)
                    ac+1

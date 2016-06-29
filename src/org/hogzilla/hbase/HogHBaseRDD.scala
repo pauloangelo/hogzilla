@@ -68,9 +68,10 @@ object HogHBaseRDD {
     val table = "hogzilla_flows"
  
     conf.set(TableInputFormat.INPUT_TABLE, table)
-    conf.set("zookeeper.session.timeout", "600000")
-    conf.setInt("hbase.client.scanner.timeout.period", 600000)
-    // You can limit the SCANNED COLUMNS here  conf.set("hbase.rpc.timeout", "1800000")
+    conf.set("zookeeper.session.timeout", "1800000")
+    conf.setInt("hbase.client.scanner.timeout.period", 1800000)
+    // You can limit the SCANNED COLUMNS here  
+    conf.set("hbase.rpc.timeout", "1800000")
     //conf.set(TableInputFormat.SCAN_COLUMNS, "flow:packets,flow:detected_protocol"),
 
    
