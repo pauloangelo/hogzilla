@@ -162,6 +162,9 @@ object HogDNS {
   val RDDtotalSize= DnsRDD.count()
   println("Filtered HogRDD has "+RDDtotalSize+" rows!")
   
+  if(RDDtotalSize == 0)
+    return
+  
   println("Calculating some variables to normalize data...")
   val DnsRDDcount = DnsRDD.map(flow => features.map { feature => flow.get(feature).toDouble }).cache()
   val n = RDDtotalSize
