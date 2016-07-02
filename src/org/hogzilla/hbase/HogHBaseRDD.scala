@@ -53,12 +53,12 @@ object HogHBaseRDD {
                      
   // "flow:inter_time-%d","flow:packet_size-%d"
 
-  val hogzilla_flows  = new HTable(conf,"hogzilla_flows")
-  val hogzilla_sflows = new HTable(conf,"hogzilla_sflows")
-  val hogzilla_events = new HTable(conf,"hogzilla_events")
-  val hogzilla_sensor = new HTable(conf,"hogzilla_sensor")
+  val hogzilla_flows      = new HTable(conf,"hogzilla_flows")
+  val hogzilla_sflows     = new HTable(conf,"hogzilla_sflows")
+  val hogzilla_events     = new HTable(conf,"hogzilla_events")
+  val hogzilla_sensor     = new HTable(conf,"hogzilla_sensor")
   val hogzilla_signatures = new HTable(conf,"hogzilla_signatures")
-  val hogzilla_mynets = new HTable(conf,"hogzilla_mynets")
+  val hogzilla_mynets     = new HTable(conf,"hogzilla_mynets")
   val hogzilla_reputation = new HTable(conf,"hogzilla_reputation")
   val hogzilla_histograms = new HTable(conf,"hogzilla_histograms")
 
