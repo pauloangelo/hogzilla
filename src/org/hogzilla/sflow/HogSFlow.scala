@@ -123,7 +123,7 @@ object HogSFlow {
     val stringFlows:String = event.data.get("stringFlows")
     
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
-                  "Abnormal behaviour: Atypical TCP port used ("+tcpport+")\n"+
+                  "Abnormal behaviour: Atypical TCP/UDP port used ("+tcpport+")\n"+
                   "IP: "+myIP+"\n"+
                   "Bytes: "+bytes+"\n"+
                   "Packets: "+numberPkts+"\n"+
@@ -144,7 +144,7 @@ object HogSFlow {
     
     
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
-                  "Abnormal behaviour: Atypical alien TCP port used ("+tcpport+")\n"+
+                  "Abnormal behaviour: Atypical alien TCP/UDP port used ("+tcpport+")\n"+
                   "IP: "+myIP+"\n"+
                   "Bytes: "+bytes+"\n"+
                   "Packets: "+numberPkts+"\n"+
@@ -289,6 +289,7 @@ object HogSFlow {
                                       val dstPort     = Bytes.toString(result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("dstPort")))
                                       val packetSize  = Bytes.toString(result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("packetSize"))).toLong
                                       val tcpFlags    = Bytes.toString(result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("tcpFlags")))
+                                      val IPprotocol    = Bytes.toString(result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("IPprotocol")))
 
                                       var direction = UNKNOWN
                                       if(tcpFlags.equals("0x02"))
@@ -304,7 +305,7 @@ object HogSFlow {
                                        srcPort,
                                        dstIP,
                                        dstPort ), 
-                                    (packetSize, 1L, direction)
+                                    (packetSize, 1L, direction,IPprotocol)
                                    )
                                }else
                                {
@@ -312,14 +313,24 @@ object HogSFlow {
                                        dstPort,
                                        srcIP,
                                        srcPort ), 
-                                    (packetSize, 1L,-direction)
+                                    (packetSize, 1L,-direction,IPprotocol)
                                    )
                                } 
                            })
+                           .filter({case ((dstIP,dstPort,srcIP,srcPort ),(packetSize,numberOfPkts,direction,iPprotocol))
+                                             =>  iPprotocol.equals("6") | iPprotocol.equals("17") // TCP or UDP
+                                  })
+                           .map({case ((dstIP,dstPort,srcIP,srcPort ),(packetSize,numberOfPkts,direction,iPprotocol))
+                                       =>((dstIP,dstPort,srcIP,srcPort ),(packetSize,numberOfPkts,direction))
+                                })
+                             
                            
     
     // (srcIP, srcPort, dstIP, dstPort, totalBytes, numberOfPkts)
-   val sflowSummary = sflowSummary1.reduceByKey({ case ((bytesA,pktsA,directionA),(bytesB,pktsB,directionB)) => (bytesA+bytesB,pktsA+pktsB,directionA+directionB)}).cache()
+   val sflowSummary = 
+     sflowSummary1
+     .reduceByKey({ case ((bytesA,pktsA,directionA),(bytesB,pktsB,directionB)) => (bytesA+bytesB,pktsA+pktsB,directionA+directionB)})
+     .cache
 
    
   println("Counting sflowSummary...")
@@ -359,12 +370,12 @@ object HogSFlow {
   .sortBy({ 
     case (myIP,(bytes,numberPkts,flowSet)) =>    bytes  }, false, 15
    )
-   .take(2000+whiteTopTalkers.size)
+   .take(5000+whiteTopTalkers.size)
    .filter(tp => {  !whiteTopTalkers.map { net => if( tp._1.startsWith(net) )
                                             { true } else{false} 
                                     }.contains(true) 
           })
-   .take(10)
+   .take(100)
   .foreach{ case (myIP,(bytes,numberPkts,flowSet)) => 
                     println("("+myIP+","+bytes+")" ) 
                     val flowMap: Map[String,String] = new HashMap[String,String]
@@ -399,7 +410,7 @@ object HogSFlow {
   
    val SMTPTalkersCollection: PairRDDFunctions[String, (Long,Long,HashSet[(String,String,String,String,Long,Long,Int)])] = sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort),(bytes,numberPkts,direction)) 
-                  => myPort.equals("25") || alienPort.equals("25")  
+                  => myPort.equals("25") | alienPort.equals("25")  
            })
     .map({
       case ((myIP,myPort,alienIP,alienPort),(bytes,numberPkts,direction)) =>
@@ -416,12 +427,12 @@ object HogSFlow {
   .sortBy({ 
     case (myIP,(bytes,numberPkts,flowSet)) =>    bytes  }, false, 15
    )
-   .take(2000+whiteSMTPTalkers.size)
+   .take(5000+whiteSMTPTalkers.size)
    .filter(tp => {  !whiteSMTPTalkers.map { net => if( tp._1.startsWith(net) )
                                             { true } else{false} 
                                     }.contains(true) 
           })
-   .take(30)
+   .take(100)
   .foreach{ case (myIP,(bytes,numberPkts,flowSet)) => 
                     println("("+myIP+","+bytes+")" ) 
                     val flowMap: Map[String,String] = new HashMap[String,String]
@@ -448,7 +459,7 @@ object HogSFlow {
   
 
   println("")
-  println("Atypical TCP port used")
+  println("Atypical TCP/UDP port used")
           
  val atypicalTCPCollection: PairRDDFunctions[String, (Long,Long,HashSet[(String,String,String,String,Long,Long,Int)],Map[String,Double],Long)] = 
     sflowSummary
@@ -533,7 +544,7 @@ object HogSFlow {
   
 
   println("")
-  println("Atypical alien TCP port used")
+  println("Atypical alien TCP/UDP port used")
   
  val atypicalAlienTCPCollection: PairRDDFunctions[String, (Long,Long,HashSet[(String,String,String,String,Long,Long,Int)],Map[String,Double],Long)] = 
     sflowSummary
@@ -766,7 +777,12 @@ object HogSFlow {
   
    val alienTooManyPairsCollection: PairRDDFunctions[(String,String), (Long,Long,HashSet[(String,String,String,String,Long,Long,Int)],Long)] = 
     sflowSummary
-    .filter({ case ((myIP,myPort,alienIP,alienPort),(packetsSize,numberPkts,direction)) => direction < 0 })
+    .filter({ case ((myIP,myPort,alienIP,alienPort),(packetsSize,numberPkts,direction)) 
+                 => direction < 0  &
+                     ! myNets.map { net =>  if( alienIP.startsWith(net) )
+                                                          { true } else{false} 
+                                              }.contains(true)
+            })
     .map({
       case ((myIP,myPort,alienIP,alienPort),(packetsSize,numberPkts,direction)) =>
          val flowSet:HashSet[(String,String,String,String,Long,Long,Int)] = new HashSet()
