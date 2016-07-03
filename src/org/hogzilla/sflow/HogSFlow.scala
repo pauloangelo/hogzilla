@@ -292,11 +292,15 @@ object HogSFlow {
                                       val IPprotocol    = Bytes.toString(result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("IPprotocol")))
 
                                       var direction = UNKNOWN
-                                      if(tcpFlags.equals("0x02"))
-                                        direction = LEFTRIGHT
-                                      if(tcpFlags.equals("0x12"))
-                                        direction = RIGHTLEFT
-                                
+                                      
+                                      if(IPprotocol.equals("6")) // If is TCP
+                                      {
+                                        if(tcpFlags.equals("0x02")) // Is a SYN pkt
+                                          direction = LEFTRIGHT
+                                        if(tcpFlags.equals("0x12")) // Is a SYN-ACK pkt
+                                          direction = RIGHTLEFT
+                                      }
+                                      
                                if(myNets.map { net =>  if( srcIP.startsWith(net) )
                                                           { true } else{false} 
                                               }.contains(true))
@@ -410,7 +414,9 @@ object HogSFlow {
   
    val SMTPTalkersCollection: PairRDDFunctions[String, (Long,Long,HashSet[(String,String,String,String,Long,Long,Int)])] = sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort),(bytes,numberPkts,direction)) 
-                  => myPort.equals("25") || alienPort.equals("25")  
+                  => ( myPort.equals("25") || alienPort.equals("25") ) &&
+                      numberPkts>1 // Avoid FP due to portscans...
+                     //! ( myPort.equals("25") && direction < 0 && numberPkts.equals(1L)) // Dismiss portscan. ie, SYN_pkt Alien->MyIP:25
            })
     .map({
       case ((myIP,myPort,alienIP,alienPort),(bytes,numberPkts,direction)) =>
@@ -549,7 +555,9 @@ object HogSFlow {
  val atypicalAlienTCPCollection: PairRDDFunctions[String, (Long,Long,HashSet[(String,String,String,String,Long,Long,Int)],Map[String,Double],Long)] = 
     sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort),(bytes,numberPkts,direction)) 
-                  =>  alienPort.toLong < 10000  
+                  =>  alienPort.toLong < 10000  &&
+                      direction > -1 &&
+                      myPort.toLong>1024
            })
     .map({
       case ((myIP,myPort,alienIP,alienPort),(bytes,numberPkts,direction)) =>
