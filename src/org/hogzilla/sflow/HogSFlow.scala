@@ -318,7 +318,7 @@ object HogSFlow {
                                } 
                            })
                            .filter({case ((dstIP,dstPort,srcIP,srcPort ),(packetSize,numberOfPkts,direction,iPprotocol))
-                                             =>  iPprotocol.equals("6") | iPprotocol.equals("17") // TCP or UDP
+                                             =>  iPprotocol.equals("6") || iPprotocol.equals("17") // TCP or UDP
                                   })
                            .map({case ((dstIP,dstPort,srcIP,srcPort ),(packetSize,numberOfPkts,direction,iPprotocol))
                                        =>((dstIP,dstPort,srcIP,srcPort ),(packetSize,numberOfPkts,direction))
@@ -410,7 +410,7 @@ object HogSFlow {
   
    val SMTPTalkersCollection: PairRDDFunctions[String, (Long,Long,HashSet[(String,String,String,String,Long,Long,Int)])] = sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort),(bytes,numberPkts,direction)) 
-                  => myPort.equals("25") | alienPort.equals("25")  
+                  => myPort.equals("25") || alienPort.equals("25")  
            })
     .map({
       case ((myIP,myPort,alienIP,alienPort),(bytes,numberPkts,direction)) =>
@@ -464,7 +464,7 @@ object HogSFlow {
  val atypicalTCPCollection: PairRDDFunctions[String, (Long,Long,HashSet[(String,String,String,String,Long,Long,Int)],Map[String,Double],Long)] = 
     sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort),(bytes,numberPkts,direction)) 
-                  =>  direction < 0 & numberPkts  >1
+                  =>  direction < 0 && numberPkts  >1
            })
     .map({
       case ((myIP,myPort,alienIP,alienPort),(bytes,numberPkts,direction)) =>
@@ -778,7 +778,7 @@ object HogSFlow {
    val alienTooManyPairsCollection: PairRDDFunctions[(String,String), (Long,Long,HashSet[(String,String,String,String,Long,Long,Int)],Long)] = 
     sflowSummary
     .filter({ case ((myIP,myPort,alienIP,alienPort),(packetsSize,numberPkts,direction)) 
-                 => direction < 0  &
+                 => direction < 0  &&
                      ! myNets.map { net =>  if( alienIP.startsWith(net) )
                                                           { true } else{false} 
                                               }.contains(true)
@@ -808,10 +808,10 @@ object HogSFlow {
   
   
   
-  atypicalNumberPairsCollectionFinal
+  alienTooManyPairsCollectionFinal
   .foreach{case  (alienIP,(packetsSize,numberPkts,flowSet,numberOfflows,numberOfPairs)) => 
                     
-                    if(numberOfPairs > alienThreshold & !alienIP.equals("0.0.0.0") )
+                    if(numberOfPairs > alienThreshold && !alienIP.equals("0.0.0.0") )
                     {                     
                             println("AlienIP: "+alienIP+ " more than "+alienThreshold+" pairs in the period: "+numberOfPairs)
                          
