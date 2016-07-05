@@ -418,7 +418,7 @@ object HogSFlow {
   
    val SMTPTalkersCollection: PairRDDFunctions[String, (Long,Long,HashSet[(String,String,String,String,String,Long,Long,Int)])] = sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytes,numberPkts,direction)) 
-                  => (  alienPort.equals("25") ) &&
+                  => (  alienPort.equals("25") &&  numberPkts>2 ) &&
                       !myNets.map { net =>  if( alienIP.startsWith(net) )  // Exclude internal communication
                                                           { true } else{false} 
                                               }.contains(true) 
