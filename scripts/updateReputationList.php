@@ -38,7 +38,7 @@ $hbasePort=9090;
 
 $GLOBALS['THRIFT_ROOT'] = '/usr/lib/php';
 
-define("DEBUG",false);
+define("DEBUG",true);
 
 // Thrift stuff
 require_once($GLOBALS['THRIFT_ROOT'].'/Thrift/ClassLoader/ThriftClassLoader.php');
@@ -66,82 +66,90 @@ $client     = new Hbase\HbaseClient($protocol);
  */
 
 // Parse arguments
-$listName
-$listType
+if(DEBUG) {  echo "Parse options\n" ;}
+$options = getopt("t:n:f:");
+$listType=@$options["t"];
+$listName=@$options["n"];
+$listFile=@$options["f"];
+
+if(strlen($listType) ==0 || strlen($listName) ==0 || strlen($listFile) ==0  )
+{
+   echo "Usage: php updateReputationList.php -t ListType -n ListName -f file \n";
+   echo "Examples: php updateReputationList.php -t whitelist -n MX      -f file_one_ip_per_line.txt \n";
+   echo "          php updateReputationList.php -t whitelist -n TTalker -f file_one_ip_per_line.txt \n";
+   exit;
+}
+
 
 // Open file
+if(DEBUG) {  echo "Open file\n" ;}
+$fileHandle = fopen($listFile, "r");
+if(!$fileHandle) {
+  echo "Error opening file $listFile .";
+  exit;
+}
 
 // Open connections
 if(DEBUG) {  echo "Open connection\n" ;}
 $transport->open();
 
 // Scan+Filter on HBase
+$filter = array();
+$filter[] = "SingleColumnValueFilter('rep', 'list_type', =, 'binary:".$listType."')";
+$filter[] = "SingleColumnValueFilter('rep', 'list',      =, 'binary:".$listName."')";
+$filterString = implode(" AND ", $filter);
+$scanFilter = new Hbase\TScan();
+$scanFilter->filterString = $filterString;
+$scanner = $client->scannerOpenWithScan("hogzilla_reputation", $scanFilter, array());
 
 // Delete rows, iterating
-
-// Iterate file
-// Create mutation
-// Add mutation to list
-// Insert mutations
-
-// Close file
-// Close connection
-
-
-
-
-if(DEBUG) {  echo "Insert sensor, if needed\n" ;}
-$scanner = $client->scannerOpenWithStop("hogzilla_sensor","","", array("sensor:description","sensor:hostname"), array());
-$row=$client->scannerGet($scanner);
-if(sizeof($row)==0) { die("Sensor table is empty in HBase\n"); }
-saveSensor($row,$con);
-$client->scannerClose($scanner);
-
-// Insert Signatures if needed. Get Signature information
-if(DEBUG) {  echo "Insert signatures, if needed\n" ;}
-$scanner = $client->scannerOpenWithStop("hogzilla_signatures","","",
-                    array("signature:class","signature:name","signature:priority",
-                          "signature:revision","signature:id","signature:group_id"),
-                    array());
-while (true) 
-{
-    $row=$client->scannerGet($scanner);
-    if(sizeof($row)==0) break;
-    saveSignature($row,$con);
-}
-
-$client->scannerClose($scanner);
-
-
-/*
- * 
- */
-if(DEBUG) {  echo "Inside loop\n" ;}
-// Open HBase and MySQL connection
-if(DEBUG) {  echo "Open connections\n" ;}
-$transport->open();
-
-// Get HBase pointer
-$scanner = $client->scannerOpenWithStop("hogzilla_events",$startrow,"",
-                        array("event:lower_ip","event:upper_ip","event:note","event:signature_id"),
-                        array());
-
-// Loop events to insert into MySQL
+if(DEBUG) {  echo "Deleting current list from HBase\n" ;}
 try
 {
     while (true) 
     {
-            $row=$client->scannerGet($scanner);
-            if(sizeof($row)==0) break;
-            $client->deleteAllRow("hogzilla_events", $row[0]->row, array()) ;
+        $row=$client->scannerGet($scanner);
+        if(sizeof($row)==0) break;
+        if(DEBUG) {  
+                     $values = $row[0]->columns;
+                     $ip     = $values["rep:ip"]->value;
+                     echo "Deleting $ip from list $listName/$listType\n" ;
+                  }
+        $client->deleteAllRow("hogzilla_reputation", $row[0]->row, array());
+    }
+    $client->scannerClose($scanner);
+    
+    // Iterate file
+    while (($ip = fgets($fileHandle)) !== false) 
+    {
+       // Parse
+       preg_replace( "/\r|\n/", "", $ip );
+       $ip=trim($ip);
+       // Create mutation
+       $mutations = array();
+       $dataIP    = array(
+            'column' => "rep:ip",
+            'value'  => $ip
+       );
+       $dataListName = array('column' => "rep:list",        'value'  => $listName );
+       $dataListType = array('column' => "rep:list_type",   'value'  => $listType );
+       $dataListDesc = array('column' => "rep:description", 'value'  => "" );
+       $mutations[] = new Hbase\Mutation($dataIP);
+       $mutations[] = new Hbase\Mutation($dataListName);
+       $mutations[] = new Hbase\Mutation($dataListType);
+       $mutations[] = new Hbase\Mutation($dataListDesc);
+       // Insert mutations
+       $client->mutateRow("hogzilla_reputation", $ip, $mutations, array());
     }
 } catch(Exception $e) 
 {
   echo 'ERROR: ',  $e->getMessage(), "\n";
 }
 
+// Close file
+fclose($fileHandle);
+
 // Close connections (HBase)
-$client->scannerClose($scanner);
 $transport->close();
 
 ?>
