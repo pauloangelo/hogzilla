@@ -239,6 +239,15 @@ object HogSFlow {
                     })
   }
   
+  def formatIPtoBytes(ip:String):Array[Byte] =
+  {
+    // Eca! Snorby doesn't support IPv6 yet. See https://github.com/Snorby/snorby/issues/65
+    if(ip.contains(":"))
+      InetAddress.getByName("255.255.6.6").getAddress
+    else  
+      InetAddress.getByName(ip).getAddress
+  }
+  
   
   /**
    * 
@@ -388,7 +397,7 @@ object HogSFlow {
                     println("("+myIP+","+bytes+")" ) 
                     val flowMap: Map[String,String] = new HashMap[String,String]
                     flowMap.put("flow:id",System.currentTimeMillis.toString)
-                    val event = new HogEvent(new HogFlow(flowMap,InetAddress.getByName(myIP).getAddress,
+                    val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(myIP),
                                                                  InetAddress.getByName("255.255.255.255").getAddress))
                     event.data.put("hostname", myIP)
                     event.data.put("bytes", bytes.toString)
@@ -418,7 +427,7 @@ object HogSFlow {
   
    val SMTPTalkersCollection: PairRDDFunctions[String, (Long,Long,HashSet[(String,String,String,String,String,Long,Long,Int)])] = sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytes,numberPkts,direction)) 
-                  => (  alienPort.equals("25") &&  numberPkts>2 ) &&
+                  => (  alienPort.equals("25") &&  numberPkts>9 ) &&
                       !myNets.map { net =>  if( alienIP.startsWith(net) )  // Exclude internal communication
                                                           { true } else{false} 
                                               }.contains(true) 
@@ -443,14 +452,15 @@ object HogSFlow {
    .take(5000+whiteSMTPTalkers.size)
    .filter(tp => {  !whiteSMTPTalkers.map { net => if( tp._1.startsWith(net) )
                                             { true } else{false} 
-                                    }.contains(true) 
+                                    }.contains(true) &&
+                     tp._2._2 > 1 // Consider just MyIPs that generated more than 2 SMTP connections
           })
    .take(100)
   .foreach{ case (myIP,(bytes,numberPkts,flowSet)) => 
                     println("("+myIP+","+bytes+")" ) 
                     val flowMap: Map[String,String] = new HashMap[String,String]
                     flowMap.put("flow:id",System.currentTimeMillis.toString)
-                    val event = new HogEvent(new HogFlow(flowMap,InetAddress.getByName(myIP).getAddress,
+                    val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(myIP),
                                                                  InetAddress.getByName("255.255.255.255").getAddress))
                     
                     event.data.put("hostname", myIP)
@@ -531,7 +541,7 @@ object HogSFlow {
                             
                             val flowMap: Map[String,String] = new HashMap[String,String]
                             flowMap.put("flow:id",System.currentTimeMillis.toString)
-                            val event = new HogEvent(new HogFlow(flowMap,InetAddress.getByName(myIP).getAddress,
+                            val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(myIP),
                                                                          InetAddress.getByName("255.255.255.255").getAddress))
                             event.data.put("myIP", myIP)
                             event.data.put("tcpport", atypical.mkString(","))
@@ -631,7 +641,7 @@ object HogSFlow {
                             
                             val flowMap: Map[String,String] = new HashMap[String,String]
                             flowMap.put("flow:id",System.currentTimeMillis.toString)
-                            val event = new HogEvent(new HogFlow(flowMap,InetAddress.getByName(myIP).getAddress,
+                            val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(myIP),
                                                                          InetAddress.getByName("255.255.255.255").getAddress))
                             event.data.put("myIP", myIP)
                             event.data.put("tcpport", atypical.mkString(","))
@@ -710,7 +720,7 @@ object HogSFlow {
                             
                             val flowMap: Map[String,String] = new HashMap[String,String]
                             flowMap.put("flow:id",System.currentTimeMillis.toString)
-                            val event = new HogEvent(new HogFlow(flowMap,InetAddress.getByName(myIP).getAddress,
+                            val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(myIP),
                                                                          InetAddress.getByName("255.255.255.255").getAddress))
                             event.data.put("numberOfPairs",numberOfPairs.toString)
                             event.data.put("myIP", myIP)
@@ -760,7 +770,7 @@ object HogSFlow {
                             
                             val flowMap: Map[String,String] = new HashMap[String,String]
                             flowMap.put("flow:id",System.currentTimeMillis.toString)
-                            val event = new HogEvent(new HogFlow(flowMap,InetAddress.getByName(myIP).getAddress,
+                            val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(myIP),
                                                                          InetAddress.getByName("255.255.255.255").getAddress))
                             event.data.put("numberOfPairs",numberOfPairs.toString)
                             event.data.put("myIP", myIP)
@@ -832,7 +842,7 @@ object HogSFlow {
                          
                             val flowMap: Map[String,String] = new HashMap[String,String]
                             flowMap.put("flow:id",System.currentTimeMillis.toString)
-                            val event = new HogEvent(new HogFlow(flowMap,InetAddress.getByName(alienIP).getAddress,
+                            val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(alienIP),
                                                                          InetAddress.getByName("255.255.255.255").getAddress))
                             
                             event.data.put("numberOfPairs",numberOfPairs.toString)
