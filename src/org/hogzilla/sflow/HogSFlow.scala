@@ -595,9 +595,11 @@ object HogSFlow {
  val atypicalAlienTCPCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int)],Map[String,Double],Long)] = 
     sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction)) 
-                  =>  alienPort.toLong < 10000  &&
+                  =>  numberPkts>1 &&
+                      alienPort.toLong < 10000  &&
                       direction > -1 &&
-                      myPort.toLong>1024
+                      myPort.toLong>1024 &&
+                      !myPort.equals("8080")
            })
     .map({
       case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction)) =>
