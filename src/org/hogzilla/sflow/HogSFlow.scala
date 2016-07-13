@@ -1,5 +1,5 @@
 /*
-* Copyright (C) 2015-2015 Paulo Angelo Alves Resende <pa@pauloangelo.com>
+* Copyright (C) 2015-2016 Paulo Angelo Alves Resende <pa@pauloangelo.com>
 *
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License Version 2 as
@@ -257,6 +257,50 @@ object HogSFlow {
     event.signature_id = signature._8.signature_id       
     event
   }  
+  
+  def populateUDPAmplifier(event:HogEvent):HogEvent =
+  {
+    val hostname:String = event.data.get("hostname")
+    val bytesUp:String = event.data.get("bytesUp")
+    val bytesDown:String = event.data.get("bytesDown")
+    val numberPkts:String = event.data.get("numberPkts")
+    val stringFlows:String = event.data.get("stringFlows")
+    val connections:String = event.data.get("connections")
+    
+    event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
+                  "Abnormal behaviour: Host is sending too many big UDP packets. May be a DDoS.\n"+
+                  "IP: "+hostname+"\n"+
+                  "Bytes Up: "+bytesUp+"\n"+
+                  "Bytes Down: "+bytesDown+"\n"+
+                  "Packets: "+numberPkts+"\n"+
+                  "Connections: "+connections+"\n"+
+                  "Flows"+stringFlows
+                  
+    event.signature_id = signature._9.signature_id       
+    event
+  }
+  
+  def populateAbusedSMTP(event:HogEvent):HogEvent =
+  {
+    val hostname:String = event.data.get("hostname")
+    val bytesUp:String = event.data.get("bytesUp")
+    val bytesDown:String = event.data.get("bytesDown")
+    val numberPkts:String = event.data.get("numberPkts")
+    val stringFlows:String = event.data.get("stringFlows")
+    val connections:String = event.data.get("connections")
+    
+    event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
+                  "Abnormal behaviour: Host is receiving too many e-mail submissions. May be an abused SMTP server. \n"+
+                  "IP: "+hostname+"\n"+
+                  "Bytes Up: "+bytesUp+"\n"+
+                  "Bytes Down: "+bytesDown+"\n"+
+                  "Packets: "+numberPkts+"\n"+
+                  "Connections: "+connections+"\n"+
+                  "Flows"+stringFlows
+                  
+    event.signature_id = signature._10.signature_id       
+    event
+  }
   
   
   def setFlows2String(flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int)]):String =
@@ -1015,9 +1059,131 @@ object HogSFlow {
                             
                             populateAlienAccessingManyHosts(event).alert()
                     }
-             }
+           }
   
-
+  /*
+   * 
+   * UDP amplifier (DDoS)
+   * 
+   */
+  
+  
+  println("")
+  println("UDP amplifier (DDoS)")
+  
+   val udpAmplifierCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int)],Long)] = sflowSummary
+    .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction)) 
+                  => (  myPort.equals("19")   ||
+                        myPort.equals("53")   ||
+                        myPort.equals("123")  ||
+                        myPort.equals("1900")
+                      ) &&
+                      proto.equals("UDP") &&
+                      bytesUp>800         &&
+                      !myNets.map { net =>  if( alienIP.startsWith(net) )  // Exclude internal communication
+                                                          { true } else{false} 
+                                              }.contains(true)                      
+           })
+    .map({
+          case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction)) =>
+               val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int)] = new HashSet()
+               flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction))
+               (myIP,(bytesUp,bytesDown,numberPkts,flowSet,1L))
+        })
+  
+  
+  udpAmplifierCollection
+    .reduceByKey({
+                   case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,connectionsA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,connectionsB)) =>
+                        (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, connectionsA+connectionsB)
+                })
+    .filter({ case  (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections)) => 
+                    numberPkts>1000
+           })
+    .sortBy({ 
+              case   (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections)) =>    bytesUp  
+            }, false, 15
+           )
+  .take(100)
+  .foreach{ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections)) => 
+                    println("("+myIP+","+bytesUp+")" ) 
+                    val flowMap: Map[String,String] = new HashMap[String,String]
+                    flowMap.put("flow:id",System.currentTimeMillis.toString)
+                    val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(myIP),
+                                                                 InetAddress.getByName("255.255.255.255").getAddress))
+                    
+                    event.data.put("hostname", myIP)
+                    event.data.put("bytesUP", bytesUp.toString)
+                    event.data.put("bytesDown", bytesDown.toString)
+                    event.data.put("numberPkts", numberPkts.toString)
+                    event.data.put("connections", connections.toString)
+                    event.data.put("stringFlows", setFlows2String(flowSet))
+                    
+                    populateUDPAmplifier(event).alert()
+           }
+   
+  
+  /*
+   * 
+   *  Abused SMTP Server
+   * 
+   */
+   
+  println("")
+  println("Abused SMTP Server")
+   val abusedSMTPBytesThreshold = 50000000L // ~50 MB
+   val abusedSMTPCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int)],Long)] = sflowSummary
+    .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction)) 
+                  =>  
+                      ( myPort.equals("465")   ||
+                        myPort.equals("587")
+                      ) &&
+                      proto.equals("TCP")  &&
+                      !myNets.map { net =>  if( alienIP.startsWith(net) )  // Exclude internal communication
+                                                          { true } else{false} 
+                                              }.contains(true) 
+           })
+    .map({
+          case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction)) =>
+               val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int)] = new HashSet()
+               flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction))
+               (myIP,(bytesUp,bytesDown,numberPkts,flowSet,1L))
+        })
+  
+  
+  abusedSMTPCollection
+    .reduceByKey({
+                   case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,connectionsA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,connectionsB)) =>
+                        (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, connectionsA+connectionsB)
+                })
+    .filter({ case  (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections)) => 
+                    connections>150 &&
+                    bytesDown > abusedSMTPBytesThreshold
+           })
+    .sortBy({ 
+              case   (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections)) =>    bytesDown  
+            }, false, 15
+           )
+  .take(100)
+  .foreach{ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections)) => 
+                    println("("+myIP+","+bytesUp+")" ) 
+                    val flowMap: Map[String,String] = new HashMap[String,String]
+                    flowMap.put("flow:id",System.currentTimeMillis.toString)
+                    val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(myIP),
+                                                                 InetAddress.getByName("255.255.255.255").getAddress))
+                    
+                    event.data.put("hostname", myIP)
+                    event.data.put("bytesUP", bytesUp.toString)
+                    event.data.put("bytesDown", bytesDown.toString)
+                    event.data.put("numberPkts", numberPkts.toString)
+                    event.data.put("connections", connections.toString)
+                    event.data.put("stringFlows", setFlows2String(flowSet))
+                    
+                    populateAbusedSMTP(event).alert()
+           }
+   
+   
+   
   }
 
 }
