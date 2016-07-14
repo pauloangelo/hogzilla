@@ -1,5 +1,5 @@
 /*
-* Copyright (C) 2015-2015 Paulo Angelo Alves Resende <pa@pauloangelo.com>
+* Copyright (C) 2015-2016 Paulo Angelo Alves Resende <pa@pauloangelo.com>
 *
 * This program is free software; you can redistribute it and/or modify
 * it under the terms of the GNU General Public License Version 2 as

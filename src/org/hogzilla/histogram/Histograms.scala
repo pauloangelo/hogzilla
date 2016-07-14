@@ -39,7 +39,7 @@ object Histograms {
     
     val ret = new HashSet[String] 
     
-    val atypicalThreshold = 0.0001D
+    val atypicalThreshold = 0.00001D
         
     val keys = histogram2.keySet
     
