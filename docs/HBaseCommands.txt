@@ -11,7 +11,6 @@ create 'hogzilla_histograms','info','values'
 put 'hogzilla_mynets', '10.', 'net:description', 'Intranet 1'
 put 'hogzilla_mynets', '10.', 'net:prefix', '10.'
 
-
 put 'hogzilla_reputation', '10.1.1.1', 'rep:description', 'SMTP Server'
 put 'hogzilla_reputation', '10.1.1.1', 'rep:ip', '10.1.1.1'
 put 'hogzilla_reputation', '10.1.1.1', 'rep:list', 'MX'

@@ -49,7 +49,8 @@ object HogHBaseRDD {
                      "flow:http_method","flow:http_url","flow:http_content_type") 
  
   val columnsSFlow = List("flow:IPprotocol","flow:IPsize","flow:agentID","flow:dstIP","flow:dstMAC","flow:dstPort","flow:ethernetType","flow:inVlan","flow:inputPort","flow:ipTos",
-                          "flow:ipTtl","flow:outVlan","flow:outputPort","flow:packetSize","flow:samplingRate","flow:srcIP","flow:srcMAC","flow:srcPort","flow:tcpFlags")
+                          "flow:ipTtl","flow:outVlan","flow:outputPort","flow:packetSize","flow:samplingRate","flow:srcIP","flow:srcMAC","flow:srcPort","flow:tcpFlags",
+                          "flow:timestamp")
                      
   // "flow:inter_time-%d","flow:packet_size-%d"
 
