@@ -68,6 +68,7 @@ object HogSFlow {
   val alienThreshold = 20
   val topTalkersThreshold:Long = 21474836480L // (20*1024*1024*1024 = 20G)
   val p2pPairsThreshold = 5
+  val p2pMyPortsThreshold = 2
   val abusedSMTPBytesThreshold = 50000000L // ~50 MB
   val p2pBytes2ndMethodThreshold = 10000000L // ~10 MB
   val p2pPairs2ndMethodThreshold = 10
@@ -75,7 +76,8 @@ object HogSFlow {
   val mediaClientCommunicationDurationThreshold = 300 // 5min (300s)
   val mediaClientPairsThreshold = p2pPairs2ndMethodThreshold
   val mediaClientUploadThreshold = 1000000L // ~1MB
-  val mediaClientDownloadThreshold = 10000000L // ~10MB
+  //val mediaClientDownloadThreshold = 10000000L // ~10MB
+  val mediaClientDownloadThreshold = 0L // 0MB
  
   /**
    * 
@@ -676,7 +678,10 @@ object HogSFlow {
                (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB, pairsA+pairsB)
               })
   .filter({ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,pairs)) =>
-                 pairs > p2pPairsThreshold
+                 pairs > p2pPairsThreshold &
+                 flowSet
+                  .map({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime) => myPort})
+                  .toList.distinct.size > p2pMyPortsThreshold
          })
   .map({ 
       case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs)) =>
@@ -814,7 +819,7 @@ object HogSFlow {
   .filter({ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,pairs)) =>
                  pairs     < mediaClientPairsThreshold  &
                  bytesUp   < mediaClientUploadThreshold &
-                 bytesDown > mediaClientDownloadThreshold
+                 bytesDown >= mediaClientDownloadThreshold
           })
     .map({ 
       case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs)) =>
