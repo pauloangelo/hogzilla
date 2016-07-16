@@ -48,7 +48,7 @@ import scala.collection.mutable.HashSet
 object HogHBaseReputation {
 
   // Ex: MX, whitelist
-	def getReputationList(listName:String, listType:String):HashSet[String] =
+	def getReputationList(listName:String, listType:String):Set[String] =
 	{
 		val list =  new HashSet[String]
 
@@ -77,7 +77,7 @@ object HogHBaseReputation {
       list.add( Bytes.toString(it.next().getValue(Bytes.toBytes("rep"),Bytes.toBytes("ip"))) )
 		}
     
-    list
+    list.toSet
 
 	}
 
