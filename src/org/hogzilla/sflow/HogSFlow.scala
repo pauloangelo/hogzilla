@@ -68,7 +68,7 @@ object HogSFlow {
   val alienThreshold = 20
   val topTalkersThreshold:Long = 21474836480L // (20*1024*1024*1024 = 20G)
   val p2pPairsThreshold = 5
-  val p2pMyPortsThreshold = 2
+  val p2pMyPortsThreshold = 4
   val abusedSMTPBytesThreshold = 50000000L // ~50 MB
   val p2pBytes2ndMethodThreshold = 10000000L // ~10 MB
   val p2pPairs2ndMethodThreshold = 10
@@ -989,7 +989,8 @@ object HogSFlow {
                       direction > -1           &
                       myPort.toLong > 1024     &
                       !myPort.equals("8080")   &
-                      !isMyIP(alienIP,myNets)
+                      !isMyIP(alienIP,myNets) // &
+                     // !ftpTalkers.contains((myIP,alienIP)) // Avoid FTP communication
            })
     .map({
       case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) =>
@@ -1021,7 +1022,7 @@ object HogSFlow {
           })
     .filter({case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram,numberOfFlows)) =>
                    !p2pTalkers.contains(myIP) & // Avoid P2P talkers
-                   !mediaStreamingClients.contains(myIP) // Avoid media streaming clients
+                   !mediaStreamingClients.contains(myIP)  // Avoid media streaming clients
            })
     .foreach{case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram,numberOfFlows)) => 
                     
