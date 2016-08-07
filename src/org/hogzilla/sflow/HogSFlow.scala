@@ -389,10 +389,10 @@ object HogSFlow {
   def ipSignificantNetwork(ip:String):String =
   {
     if(ip.contains("."))
-      ip.substring(0,ip.lastIndexOf("."))
+      return ip.substring(0,ip.lastIndexOf("."))
     
     if(ip.contains(":"))
-      ip.substring(0,ip.lastIndexOf(":"))
+      return ip.substring(0,ip.lastIndexOf(":"))
       
     ip
   }
