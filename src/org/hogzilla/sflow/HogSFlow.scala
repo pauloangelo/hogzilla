@@ -336,14 +336,8 @@ object HogSFlow {
                   "Packets: "+numberPkts+"\n"+
                   "Connections: "+connections+"\n"+
                   "Flows"+stringFlows
-      
-    /*
-     * XXXXXXXXXXXXXXXXXXXXXXXXXXXXx
-     *               
-     */
-                  
-    //event.signature_id = signature._11.signature_id    
-    event.signature_id = signature._8.signature_id       
+            
+    event.signature_id = signature._11.signature_id          
     event
   }
  
