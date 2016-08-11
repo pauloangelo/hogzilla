@@ -67,6 +67,8 @@ object HogSFlow {
   
   val alienThreshold = 20
   val topTalkersThreshold:Long = 21474836480L // (20*1024*1024*1024 = 20G)
+  val atypicalPairsThresholdMIN = 100
+  val atypicalAmountDataThresholdMIN = 1073741824L // (1*1024*1024*1024 = 1G) 
   val p2pPairsThreshold = 5
   val p2pMyPortsThreshold = 4
   val abusedSMTPBytesThreshold = 50000000L // ~50 MB
@@ -1135,11 +1137,11 @@ object HogSFlow {
     case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,pairsA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,pairsB)) =>
       (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB, pairsA+pairsB)
   })
-  .filter{case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram,numberOfFlows)) =>
-                   !p2pTalkers.contains(myIP) // Avoid P2P talkers
+  .filter{case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs)) =>
+                   !p2pTalkers.contains(myIP) & // Avoid P2P talkers
+                   numberOfPairs > atypicalPairsThresholdMIN
            }
   .foreach{case  (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs)) => 
-                    
                     val savedHistogram=HogHBaseHistogram.getHistogram("HIST03-"+myIP)
                     
                     val histogram = new HashMap[String,Double]
@@ -1216,8 +1218,9 @@ object HogSFlow {
     case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,pairsA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,pairsB)) =>
          (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB, pairsA+pairsB)
   })
-  .filter{case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram,numberOfFlows)) =>
-               !p2pTalkers.contains(myIP) // Avoid P2P talkers
+  .filter{case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs)) =>
+               !p2pTalkers.contains(myIP) & // Avoid P2P talkers
+               bytesUp > atypicalAmountDataThresholdMIN
          }
   .foreach{case  (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs)) => 
                     
