@@ -32,22 +32,19 @@ import org.apache.hadoop.hbase.KeyValue
 import org.apache.hadoop.hbase.CellUtil
 import org.hogzilla.histogram.HogHistogram
 import breeze.stats.hist
+import org.apache.hadoop.hbase.client.Result
 
 
 
 object HogHBaseHistogram {
 
-	//def getHistogram(histName:String):Map[String,Double] =
-  def getHistogram(histName:String):HogHistogram =  
-	{
-	   val map=new HashMap[String,Double]
-    
-     val get1 = new Get(Bytes.toBytes(histName))
-     
-    val result = HogHBaseRDD.hogzilla_histograms.get(get1)  //getScanner(new Scan()).iterator()
-    
-    if(!result.isEmpty())
-    {
+  def mapByResult(result:Result):HashMap[String,Double] =
+  {
+  
+   val map=new HashMap[String,Double]
+
+   if(!result.isEmpty())
+   {
        val cells = result.listCells()
        
        val it = cells.iterator()
@@ -63,9 +60,22 @@ object HogHBaseHistogram {
           
           if(column.equals("values"))
              map.put(columnQualifier,value.toDouble)
-       }   
-       
-       
+       }  
+    }
+   
+    map
+  }
+  
+  def getHistogram(histName:String):HogHistogram =  
+	{
+	  
+     val get1 = new Get(Bytes.toBytes(histName))
+     
+    val result = HogHBaseRDD.hogzilla_histograms.get(get1)  //getScanner(new Scan()).iterator()
+    val map=mapByResult(result)
+    
+     if(!map.isEmpty)
+     {
        //val histName = Bytes.toString(result.getValue(Bytes.toBytes("info"), Bytes.toBytes("name")))
        val sizeArray = result.getValue(Bytes.toBytes("info"), Bytes.toBytes("size"))
        if(sizeArray.length==0)

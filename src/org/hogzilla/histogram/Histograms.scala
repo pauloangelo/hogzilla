@@ -39,7 +39,7 @@ object Histograms {
     
     val ret = new HashSet[String] 
     
-    val atypicalThreshold = 0.00001D
+    val atypicalThreshold = 0.000001D
         
     val keys = histogram2.keySet
     
@@ -86,6 +86,34 @@ object Histograms {
     new HogHistogram(histogram1.histName,total,histogram1.histMap)
   }
   
+   
+  // hist1 - hist2
+  def difference(histogram1:HogHistogram,histogram2:HogHistogram):HogHistogram = 
+  {
+         
+    val keys = histogram2.histMap.keySet // ++ histogram2.histMap.keySet
+    
+    keys./:(0.0){ case (ac,key) =>
+                  val p:Double = { if(histogram1.histMap.get(key).isEmpty) 0 else histogram1.histMap.get(key).get }
+                  val q:Double = { if(histogram2.histMap.get(key).isEmpty) 0 else histogram2.histMap.get(key).get }
+                  
+                  if(p>0 || q>0)
+                  {
+                    val newp = (
+                        
+                        p*histogram1.histSize.toDouble-
+                        q*histogram2.histSize.toDouble
+
+                        )/(histogram1.histSize.toDouble-histogram2.histSize.toDouble)
+
+                        histogram1.histMap.put(key,newp)
+                  }
+                  0D
+                }
+    
+    val total = histogram1.histSize-histogram2.histSize
+    new HogHistogram(histogram1.histName,total,histogram1.histMap)
+  }
   
   /*
   final val EPS = 1e-10

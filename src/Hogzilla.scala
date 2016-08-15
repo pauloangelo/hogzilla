@@ -22,7 +22,7 @@ import org.apache.spark.SparkContext
 import org.hogzilla.hbase.HogHBaseRDD
 import org.hogzilla.initiate.HogInitiate
 import org.hogzilla.prepare.HogPrepare
-import org.hogzilla.sflow.HogSFlow
+import org.hogzilla.sflow._
 import org.hogzilla.http.HogHTTP
 import org.hogzilla.dns.HogDNS
 
@@ -48,7 +48,7 @@ object Hogzilla {
         
     // Initiate HogZilla
     HogInitiate.initiate(spark);
-    
+ /*   
     // Prepare the data
     HogPrepare.prepare(HogRDD)
     
@@ -65,6 +65,10 @@ object Hogzilla {
     
     val HogRDDSFlow = HogHBaseRDD.connectSFlow(spark);
     HogSFlow.run(HogRDDSFlow,spark);
+ */   
+    
+    val HogRDDHistograms = HogHBaseRDD.connectHistograms(spark);
+    HogSFlowHistograms.run(HogRDDHistograms,spark);
     
     // Stop Spark
     spark.stop()

@@ -109,7 +109,32 @@ object HogHBaseRDD {
                                                 
      return hBaseRDD
   }
+  
+  
     
+  def connectHistograms(spark: SparkContext):RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)]=
+  {
+    val table = "hogzilla_histograms"
+ 
+    conf.set(TableInputFormat.INPUT_TABLE, table)
+    conf.set("zookeeper.session.timeout", "600000")
+    conf.setInt("hbase.client.scanner.timeout.period", 600000)
+    //conf.set("hbase.rpc.timeout", "1800000")
+    // You can limit the SCANNED COLUMNS here  
+    //conf.set(TableInputFormat.SCAN_COLUMNS, "flow:packets,flow:detected_protocol"),
+
+   
+   if (!admin.isTableAvailable(table)) {
+     println("Table hogzilla_sflows does not exist.")
+    }
+    
+     val hBaseRDD = spark.newAPIHadoopRDD(conf, classOf[TableInputFormat],
+                                                classOf[org.apache.hadoop.hbase.io.ImmutableBytesWritable],
+                                                classOf[org.apache.hadoop.hbase.client.Result])
+                                                
+     return hBaseRDD
+  }
+  
   def close()
   {
      admin.close()
