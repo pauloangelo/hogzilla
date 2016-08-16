@@ -105,7 +105,13 @@ object HogSFlowHistograms {
       InetAddress.getByName(ip).getAddress
   }
  
-
+  def isMyIP(ip:String,myNets:Set[String]):Boolean =
+  {
+    myNets.map ({ net =>  if( ip.startsWith(net) )
+                              { true } 
+                          else{false} 
+                }).contains(true)
+  }
   
   
   /**
@@ -116,7 +122,17 @@ object HogSFlowHistograms {
   def realRun(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)])
   {
     
-        
+   val myNetsTemp =  new HashSet[String]
+      
+   val it = HogHBaseRDD.hogzilla_mynets.getScanner(new Scan()).iterator()
+   while(it.hasNext())
+   {
+      myNetsTemp.add(Bytes.toString(it.next().getValue(Bytes.toBytes("net"),Bytes.toBytes("prefix"))))
+   }
+    
+   val myNets:scala.collection.immutable.Set[String] = myNetsTemp.toSet
+   
+   
   val summary1: RDD[(String,Long,Set[Long],HashMap[String,Double])] 
                       = HogRDD
                         .map ({  case (id,result) => 
@@ -129,15 +145,14 @@ object HogSFlowHistograms {
                                                            .keySet
                                                            .map({ case key => key.toDouble.toLong })
                                                            .toSet
-
-                                      
                                       //"HIST01-"+myIP
                                       
                                       (histogramName,histogramSize,keys,histMap)
                            })
                            .filter({case (histogramName,histogramSize,keys,histMap) =>
                                          histogramName.startsWith("HIST01") &
-                                         histogramSize>20
+                                         histogramSize>20 &
+                                         isMyIP(histogramName.subSequence(histogramName.lastIndexOf("-")+1, histogramName.length()).toString,myNets)
                                    })
                            .cache
                            
@@ -169,7 +184,7 @@ object HogSFlowHistograms {
   
    //(5 to 30 by 5).toList.par
    
-  val k=30
+  val k=10
   
         println("Estimating model, k="+k)
         val kmeans = new KMeans()
@@ -191,17 +206,23 @@ object HogSFlowHistograms {
         val mean    = kmeansResult.map(_._2._1).mean
         val stdDev  = kmeansResult.map(_._2._1).stdev
         val max     = kmeansResult.map(_._2._1).max
+        val elementsPerCluster = kmeansResult.countByKey().toList.sortBy(_._1).toMap
    
         println("(Mean,StdDev,Max)("+k+"): "+mean+","+stdDev+","+max+".")
-        println("Elements per cluster:\n"+kmeansResult.countByKey().toList.sortBy(_._1).mkString(",\n"))
+        println("Elements per cluster:\n"+elementsPerCluster.mkString(",\n"))
         
         val grouped = kmeansResult.groupByKey()
         
         
-        grouped.foreach({ case ((clusterIdx,iterator)) =>
+        grouped
+        .foreach({ case ((clusterIdx,iterator)) =>
                     
-                     println("Group: "+clusterIdx)
-                    
+                  val centroid     = model.clusterCenters(clusterIdx)
+                  val centroidMain = allKeys.zip(centroid.toArray).filter(_._2>20)
+                  val clusterSize = elementsPerCluster.get(clusterIdx).get
+                     
+                  if(clusterSize>10 & centroidMain.size>0)
+                  {
                      val group=iterator
                         .map({ case  (distance,histogramName,histogramSize,keys,vector) =>
                                      val hogAccessHistogram = HogHBaseHistogram
@@ -211,7 +232,6 @@ object HogSFlowHistograms {
                                (distance,histogramName,histogramSize,keys,vector,hogAccessHistogram)                                     
                              })
                     
-                      println("Building group histogram...")
                      
                       val groupHistogram = 
                            group
@@ -219,12 +239,10 @@ object HogSFlowHistograms {
                            .reduce({(hogAccessHistogram1,hogAccessHistogram2) =>
                                         Histograms.merge(hogAccessHistogram1,hogAccessHistogram2)
                                   })
-                      
-                      println("Group "+clusterIdx+"\nGroupHistogram\n"+groupHistogram.histMap.mkString(",\n"))       
-                      
+                         
                       group
                       .filter({ case (distance,histogramName,histogramSize,keys,vector,hogAccessHistogram) =>
-                                   hogAccessHistogram.histSize>100
+                                   hogAccessHistogram.histSize>20
                               })
                       .map({ case (distance,histogramName,histogramSize,keys,vector,hogAccessHistogram) =>
                             
@@ -234,11 +252,19 @@ object HogSFlowHistograms {
                             
                             if(atypical.size>0)
                             {
-                              println(hogAccessHistogram.histName+" Cluster: "+clusterIdx)
-                              println(hogAccessHistogram.histMap.mkString(",\n"))
-                              println("Atypicals ("+clusterIdx+"): "+atypical.mkString(","))
+                              println("################################################################\n"+
+                                      "CLUSTER: "+clusterIdx+"\n"+
+                                      "Centroid:\n"+centroidMain.mkString(",\n")+"\n"+
+                                      "HistSize mean: "+(groupHistogram.histSize/clusterSize)+"\n"+
+                                      "HistSize:"+hogAccessHistogram.histSize+"\n"+
+                                      "Atypicals: "+atypical.mkString(",")+"\n"+
+                                      "Histogram: "+hogAccessHistogram.histName+"\n"+
+                                      hogAccessHistogram.histMap.mkString(",\n")+"\n"+
+                                      "GroupHistogram:\n"+groupHistogram.histMap.mkString(",\n")+"\n")
                             }
-                      })
+                          })
+                      
+                      } 
                  })
                       
     

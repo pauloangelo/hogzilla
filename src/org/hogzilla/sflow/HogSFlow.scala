@@ -67,7 +67,7 @@ object HogSFlow {
   
   val alienThreshold = 20
   val topTalkersThreshold:Long = 21474836480L // (20*1024*1024*1024 = 20G)
-  val atypicalPairsThresholdMIN = 100
+  val atypicalPairsThresholdMIN = 300
   val atypicalAmountDataThresholdMIN = 1073741824L // (1*1024*1024*1024 = 1G) 
   val p2pPairsThreshold = 5
   val p2pMyPortsThreshold = 4
@@ -933,7 +933,7 @@ object HogSFlow {
                     
                     val hogHistogram=HogHBaseHistogram.getHistogram("HIST01-"+myIP)
                     
-                    if(hogHistogram.histSize < 1000)
+                    if(hogHistogram.histSize < 100)
                     {
                       //println("IP: "+dstIP+ "  (N:"+qtd+",S:"+hogHistogram.histSize+") - Learn More!")
                       HogHBaseHistogram.saveHistogram(Histograms.merge(hogHistogram, new HogHistogram("",numberOfFlows,histogram)))
@@ -1142,7 +1142,7 @@ object HogSFlow {
                     val key = floor(log(numberOfPairs.*(1000)+1D)).toString
                     histogram.put(key, 1D)
                     
-                    if(savedHistogram.histSize< 100)
+                    if(savedHistogram.histSize< 10)
                     {
                       //println("MyIP: "+myIP+ "  (N:1,S:"+hogHistogram.histSize+") - Learn More!")
                       HogHBaseHistogram.saveHistogram(Histograms.merge(savedHistogram, new HogHistogram("",1L,histogram)))
@@ -1224,7 +1224,7 @@ object HogSFlow {
                     val key = floor(log(bytesUp.*(0.0001)+1D)).toString
                     histogram.put(key, 1D)
                     
-                    if(savedHistogram.histSize< 100)
+                    if(savedHistogram.histSize< 10)
                     {
                       //println("MyIP: "+myIP+ "  (N:1,S:"+hogHistogram.histSize+") - Learn More!")
                       HogHBaseHistogram.saveHistogram(Histograms.merge(savedHistogram, new HogHistogram("",1L,histogram)))
