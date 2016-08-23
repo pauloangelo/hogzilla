@@ -58,7 +58,7 @@ object HogSFlow {
                    HogSignature(3,"HZ: Atypical TCP/UDP port used",            2,1,826001003,826).saveHBase(),//3
                    HogSignature(3,"HZ: Atypical alien TCP/UDP port used",      2,1,826001004,826).saveHBase(),//4
                    HogSignature(3,"HZ: Atypical number of pairs in the period",2,1,826001005,826).saveHBase(),//5
-                   HogSignature(3,"HZ: Atypical amount of data transfered",    2,1,826001006,826).saveHBase(),//6
+                   HogSignature(3,"HZ: Atypical amount of data transferred",    2,1,826001006,826).saveHBase(),//6
                    HogSignature(3,"HZ: Alien accessing too much hosts",        3,1,826001007,826).saveHBase(),//7
                    HogSignature(3,"HZ: P2P communication",                     3,1,826001008,826).saveHBase(),//8
                    HogSignature(3,"HZ: UDP amplifier (DDoS)",                  1,1,826001009,826).saveHBase(),//9
