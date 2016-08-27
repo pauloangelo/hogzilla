@@ -33,6 +33,7 @@ import org.apache.hadoop.hbase.CellUtil
 import org.hogzilla.histogram.HogHistogram
 import breeze.stats.hist
 import org.apache.hadoop.hbase.client.Result
+import org.apache.hadoop.hbase.client.Delete
 
 
 
@@ -97,7 +98,7 @@ object HogHBaseHistogram {
   //def saveHistogram(histName:String,size:Long,hist:Map[String,Double]) =
   def saveHistogram(hogHist:HogHistogram) =
   {
-    val (histName,size,map) = (hogHist.histName, hogHist.histSize, hogHist.histMap)
+      val (histName,size,map) = (hogHist.histName, hogHist.histSize, hogHist.histMap)
     
       val put = new Put(Bytes.toBytes(histName))
       
@@ -109,6 +110,7 @@ object HogHBaseHistogram {
                                            0 }
       
       
+      HogHBaseRDD.hogzilla_histograms.delete(new Delete(put.getRow))
       HogHBaseRDD.hogzilla_histograms.put(put)
     
   }

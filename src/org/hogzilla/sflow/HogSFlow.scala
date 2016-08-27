@@ -63,11 +63,12 @@ object HogSFlow {
                    HogSignature(3,"HZ: P2P communication",                     3,1,826001008,826).saveHBase(),//8
                    HogSignature(3,"HZ: UDP amplifier (DDoS)",                  1,1,826001009,826).saveHBase(),//9
                    HogSignature(3,"HZ: Abused SMTP Server",                    1,1,826001010,826).saveHBase(),//10
-                   HogSignature(3,"HZ: Media streaming client",                3,1,826001011,826).saveHBase())//11
+                   HogSignature(3,"HZ: Media streaming client",                3,1,826001011,826).saveHBase(),//11
+                   HogSignature(3,"HZ: DNS Tunnel",                            1,1,826001012,826).saveHBase())//12
   
   val alienThreshold = 20
   val topTalkersThreshold:Long = 21474836480L // (20*1024*1024*1024 = 20G)
-  val atypicalPairsThresholdMIN = 300
+  val atypicalPairsThresholdMIN = 100
   val atypicalAmountDataThresholdMIN = 1073741824L // (1*1024*1024*1024 = 1G) 
   val p2pPairsThreshold = 5
   val p2pMyPortsThreshold = 4
@@ -80,6 +81,7 @@ object HogSFlow {
   val mediaClientUploadThreshold = 1000000L // ~1MB
   //val mediaClientDownloadThreshold = 10000000L // ~10MB
   val mediaClientDownloadThreshold = 0L // 0MB
+  val dnsTunnelThreshold = 50000000L // ~50 MB
  
   /**
    * 
@@ -192,6 +194,9 @@ object HogSFlow {
     val bytesDown:String = event.data.get("bytesDown")
     val numberPkts:String = event.data.get("numberPkts")
     val stringFlows:String = event.data.get("stringFlows")
+    val pairsMean:String = event.data.get("pairsMean")
+    val pairsStdev:String = event.data.get("pairsStdev")
+    
     
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
                   "Abnormal behaviour: Atypical number of pairs in the period ("+numberOfPairs+")\n"+
@@ -200,6 +205,7 @@ object HogSFlow {
                   "Bytes Down: "+bytesDown+"\n"+
                   "Packets: "+numberPkts+"\n"+
                   "Number of pairs: "+numberOfPairs+"\n"+
+                  "Pairs Mean/Stddev (all MyHosts): "+pairsMean+"/"+pairsStdev+"\n"+
                   "Flows"+stringFlows
                   
     event.signature_id = signature._5.signature_id       
@@ -214,12 +220,15 @@ object HogSFlow {
     val bytesDown:String = event.data.get("bytesDown")
     val numberPkts:String = event.data.get("numberPkts")
     val stringFlows:String = event.data.get("stringFlows")
+    val dataMean:String = event.data.get("dataMean")
+    val dataStdev:String = event.data.get("dataStdev")
     
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
                   "Abnormal behaviour: Atypical amount of data uploaded ("+bytesUp+" bytes)\n"+
                   "IP: "+myIP+"\n"+
                   "Bytes Up: "+bytesUp+"\n"+
                   "Bytes Down: "+bytesDown+"\n"+
+                  "Bytes Up Mean/Stddev (all MyHosts): "+dataMean+"/"+dataStdev+"\n"+
                   "Packets: "+numberPkts+"\n"+
                   "Number of pairs: "+numberOfPairs+"\n"+
                   "Flows"+stringFlows
@@ -318,6 +327,7 @@ object HogSFlow {
     event
   }
   
+ 
    
   def populateMediaClient(event:HogEvent):HogEvent =
   {
@@ -340,26 +350,50 @@ object HogSFlow {
     event.signature_id = signature._11.signature_id          
     event
   }
+  
+     
+  def populateDNSTunnel(event:HogEvent):HogEvent =
+  {
+    val hostname:String = event.data.get("hostname")
+    val bytesUp:String = event.data.get("bytesUp")
+    val bytesDown:String = event.data.get("bytesDown")
+    val numberPkts:String = event.data.get("numberPkts")
+    val stringFlows:String = event.data.get("stringFlows")
+    val connections:String = event.data.get("connections")
+    
+    event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
+                  "Abnormal behaviour: Host has DNS communication with large amount of data. \n"+
+                  "IP: "+hostname+"\n"+
+                  "Bytes Up: "+bytesUp+"\n"+
+                  "Bytes Down: "+bytesDown+"\n"+
+                  "Packets: "+numberPkts+"\n"+
+                  "Connections: "+connections+"\n"+
+                  "Flows"+stringFlows
+                  
+    event.signature_id = signature._12.signature_id       
+    event
+  }
+  
  
   
-  def setFlows2String(flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)]):String =
+  def setFlows2String(flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)]):String =
   {
      flowSet.toList.sortBy(_._5)
             .reverse
-            ./:("")({ case (c,(srcIP1,srcPort1,dstIP1,dstPort1,proto1,bytesUP,bytesDOWN,numberPkts1,direction1,beginTime,endTime)) 
+            ./:("")({ case (c,(srcIP1,srcPort1,dstIP1,dstPort1,proto1,bytesUP,bytesDOWN,numberPkts1,direction1,beginTime,endTime,sampleRate)) 
                         => 
                           if(direction1>0)
                           {
                            c+"\n"+
-                           srcIP1+":"+srcPort1+" => "+dstIP1+":"+dstPort1+"  ("+proto1+", Upload: "+bytesUP+" bytes, Download: "+bytesDOWN+" bytes,"+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s)"
+                           srcIP1+":"+srcPort1+" => "+dstIP1+":"+dstPort1+"  ("+proto1+", Upload: "+bytesUP+" bytes, Download: "+bytesDOWN+" bytes,"+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s, sampling rate: 1/"+sampleRate+")"
                           }else if(direction1<0)
                           {  
                            c+"\n"+
-                           srcIP1+":"+srcPort1+" <= "+dstIP1+":"+dstPort1+"  ("+proto1+", Download: "+bytesUP+" bytes, Upload: "+bytesDOWN+" bytes,"+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s)"
+                           srcIP1+":"+srcPort1+" <= "+dstIP1+":"+dstPort1+"  ("+proto1+", Download: "+bytesUP+" bytes, Upload: "+bytesDOWN+" bytes,"+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s, sampling rate: 1/"+sampleRate+")"
                           }else
                           {  
                            c+"\n"+
-                           srcIP1+":"+srcPort1+" <?> "+dstIP1+":"+dstPort1+"  ("+proto1+", Left-to-right: "+bytesUP+" bytes, Right-to-left: "+bytesDOWN+" bytes,"+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s)"
+                           srcIP1+":"+srcPort1+" <?> "+dstIP1+":"+dstPort1+"  ("+proto1+", Left-to-right: "+bytesUP+" bytes, Right-to-left: "+bytesDOWN+" bytes,"+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s, sampling rate: 1/"+sampleRate+")"
                           }
                     })
   }
@@ -426,7 +460,7 @@ object HogSFlow {
   val LEFTRIGHT = 1
   val RIGHTLEFT = -1
       
-  val sflowSummary1: PairRDDFunctions[(String,String,String,String,String), (Long,Long,Long,Int,Long,Long)] 
+  val sflowSummary1: PairRDDFunctions[(String,String,String,String,String), (Long,Long,Long,Int,Long,Long,Long)] 
                       = HogRDD
                         .map ({  case (id,result) => 
                                      /* Performance
@@ -445,6 +479,7 @@ object HogSFlow {
                                       val tcpFlags    = Bytes.toString(result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("tcpFlags")))
                                       val IPprotocol  = Bytes.toString(result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("IPprotocol")))
                                       val timestamp   = Bytes.toString(result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("timestamp"))).toLong
+                                      val sampleRate   = Bytes.toString(result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("samplingRate"))).toLong
 
                                       var direction = UNKNOWN
                                       var protoName="UDP" // We filter below TCP or UDP
@@ -456,6 +491,16 @@ object HogSFlow {
                                           direction = LEFTRIGHT
                                         if(tcpFlags.equals("0x12")) // Is a SYN-ACK pkt
                                           direction = RIGHTLEFT
+                                          
+                                        // Suppose that ports < 1024 would not used for clients
+                                        if(direction==UNKNOWN)
+                                        {
+                                          if(dstPort.toInt<1024)
+                                            direction = LEFTRIGHT
+                                            
+                                          if(srcPort.toInt<1024)
+                                            direction = RIGHTLEFT
+                                        }
                                       }
                                       
                                if(!isMyIP(srcIP,myNets))
@@ -465,7 +510,7 @@ object HogSFlow {
                                        srcIP,
                                        srcPort, 
                                        protoName ), 
-                                    (0L, packetSize, 1L,-direction,timestamp,timestamp,IPprotocol)
+                                    (0L, packetSize, 1L,-direction,timestamp,timestamp,IPprotocol,sampleRate)
                                    )
                                }else
                                {
@@ -474,24 +519,24 @@ object HogSFlow {
                                        dstIP,
                                        dstPort, 
                                        protoName ), 
-                                    (packetSize, 0L, 1L, direction,timestamp,timestamp,IPprotocol)
+                                    (packetSize, 0L, 1L, direction,timestamp,timestamp,IPprotocol,sampleRate)
                                    )
                                    
                                } 
                            })
-                           .filter({case ((myIP,myPort,alienIP,alienPort, proto ),(bytesUP,bytesDown,numberOfPkts,direction,beginTime,endTime,iPprotocolNumber))
+                           .filter({case ((myIP,myPort,alienIP,alienPort, proto ),(bytesUP,bytesDown,numberOfPkts,direction,beginTime,endTime,iPprotocolNumber,sampleRate))
                                              =>  iPprotocolNumber.equals("6") || iPprotocolNumber.equals("17") // TCP or UDP
                                   })
-                           .map({case ((myIP,myPort,alienIP,alienPort, proto ),(bytesUP,bytesDown,numberOfPkts,direction,beginTime,endTime,iPprotocol))
-                                    =>((myIP,myPort,alienIP,alienPort, proto ),(bytesUP,bytesDown,numberOfPkts,direction,beginTime,endTime))
+                           .map({case ((myIP,myPort,alienIP,alienPort, proto ),(bytesUP,bytesDown,numberOfPkts,direction,beginTime,endTime,iPprotocol,sampleRate))
+                                    =>((myIP,myPort,alienIP,alienPort, proto ),(bytesUP,bytesDown,numberOfPkts,direction,beginTime,endTime,sampleRate))
                                 }).cache
 
 
     // (srcIP, srcPort, dstIP, dstPort, totalBytes, numberOfPkts)
   val sflowSummary = 
       sflowSummary1
-      .reduceByKey({ case ((bytesUpA,bytesDownA,pktsA,directionA,beginTimeA,endTimeA),(bytesUpB,bytesDownB,pktsB,directionB,beginTimeB,endTimeB)) => 
-                           (bytesUpA+bytesUpB,bytesDownA+bytesDownB,pktsA+pktsB,directionA+directionB,beginTimeA.min(beginTimeB),endTimeA.max(endTimeB))
+      .reduceByKey({ case ((bytesUpA,bytesDownA,pktsA,directionA,beginTimeA,endTimeA,sampleRateA),(bytesUpB,bytesDownB,pktsB,directionB,beginTimeB,endTimeB,sampleRateB)) => 
+                           (bytesUpA+bytesUpB,bytesDownA+bytesDownB,pktsA+pktsB,directionA+directionB,beginTimeA.min(beginTimeB),endTimeA.max(endTimeB),(sampleRateA+sampleRateB)/2)
                   })
       .cache
          
@@ -523,26 +568,26 @@ object HogSFlow {
   println("")
   println("Top Talkers (bytes):")
   
-  val topTalkerCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)])] = 
+  val topTalkerCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)],Long)] = 
   sflowSummary.map({
-                  case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) =>
-                       val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)] = new HashSet()
-                       flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime))
-                       (myIP,(bytesUp,bytesDown,numberPkts,flowSet))
+                  case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) =>
+                       val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)] = new HashSet()
+                       flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate))
+                       (myIP,(bytesUp,bytesDown,numberPkts,flowSet,sampleRate))
                     })
   
   
   topTalkerCollection
   .reduceByKey({
-                case ((bytesUpA,bytesDownA,numberPktsA,flowSetA),(bytesUpB,bytesDownB,numberPktsB,flowSetB)) =>
-                     (bytesUpA+bytesUpB, bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB)
+                case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,sampleRateB)) =>
+                     (bytesUpA+bytesUpB, bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, (sampleRateA+sampleRateB)/2)
               })
   .filter({
-    case (myIP,(bytesUp,bytesDown,numberPkts,flowSet)) =>
-    bytesUp > topTalkersThreshold
+    case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,sampleRate)) =>
+    bytesUp*sampleRate > topTalkersThreshold
          })
   .sortBy({ 
-          case (myIP,(bytesUp,bytesDown,numberPkts,flowSet)) =>    bytesUp  }, false, 15
+          case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,sampleRate)) =>    bytesUp  }, false, 15
           )
   .take(5000+whiteTopTalkers.size)
   .filter(tp => {  !whiteTopTalkers.map { net => if( tp._1.startsWith(net) )
@@ -550,7 +595,7 @@ object HogSFlow {
                                         }.contains(true) 
           })
   .take(200)
-  .foreach{   case (myIP,(bytesUp,bytesDown,numberPkts,flowSet)) => 
+  .foreach{   case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,sampleRate)) => 
                     println("("+myIP+","+bytesUp+")" ) 
                     val flowMap: Map[String,String] = new HashMap[String,String]
                     flowMap.put("flow:id",System.currentTimeMillis.toString)
@@ -558,7 +603,7 @@ object HogSFlow {
                                                                  InetAddress.getByName("255.255.255.255").getAddress))
                     event.data.put("hostname", myIP)
                     event.data.put("bytesUp", bytesUp.toString)
-                    event.data.put("bytesDown", bytesUp.toString)
+                    event.data.put("bytesDown", bytesDown.toString)
                     event.data.put("numberPkts", numberPkts.toString)
                     event.data.put("threshold", topTalkersThreshold.toString)
                     event.data.put("stringFlows", setFlows2String(flowSet))
@@ -581,41 +626,41 @@ object HogSFlow {
   println("(SRC IP, DST IP, Bytes, Qtd Flows)")
   
   
-   val SMTPTalkersCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)],Long)] = 
+   val SMTPTalkersCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)],Long,Long)] = 
     sflowSummary
-    .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) 
+    .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) 
                   =>  alienPort.equals("25") &  
-                      numberPkts>9 &
+                      numberPkts>5 &
                       !isMyIP(alienIP,myNets) // Exclude internal communication
            })
     .map({
-           case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) =>
-                val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)] = new HashSet()
-                flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime))
-                (myIP,(bytesUp,bytesDown,numberPkts,flowSet,1L))
+           case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) =>
+                val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)] = new HashSet()
+                flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate))
+                (myIP,(bytesUp,bytesDown,numberPkts,flowSet,1L,sampleRate))
         })
   
   
   SMTPTalkersCollection
   .reduceByKey({
-          case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,connectionsA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,connectionsB)) =>
-               (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, connectionsA+connectionsB)
+          case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,connectionsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,connectionsB,sampleRateB)) =>
+               (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, connectionsA+connectionsB,(sampleRateA+sampleRateB)/2)
               })
   .sortBy({ 
-              case   (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections)) =>    bytesUp  
+              case   (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) =>    bytesUp  
           }, false, 15
          )
-  .take(5000+whiteSMTPTalkers.size)
-  .filter({ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections)) => 
-                   {  
-                     !whiteSMTPTalkers.map { net => if( myIP.startsWith(net) )
-                                                      { true } else{false} 
-                                           }.contains(true) &
-                     connections > 1 // Consider just MyIPs that generated more than 2 SMTP connections
-                   }
-          })
-  .take(100)
-  .foreach{ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections)) => 
+  //.take(5000+whiteSMTPTalkers.size)
+  //.filter({ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) => 
+  //                 {  
+ //                    !whiteSMTPTalkers.map { net => if( myIP.startsWith(net) )
+  //                                                    { true } else{false} 
+  //                                         }.contains(true) &
+  //                   connections > 1 // Consider just MyIPs that generated more than 2 SMTP connections
+  //                 }
+  //        })
+  .take(30)
+  .foreach{ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) => 
                     println("("+myIP+","+bytesUp+")" ) 
                     val flowMap: Map[String,String] = new HashMap[String,String]
                     flowMap.put("flow:id",System.currentTimeMillis.toString)
@@ -642,28 +687,28 @@ object HogSFlow {
   println("FTP Talker")
   
   val ftpTalkersCollection:PairRDDFunctions[(String,String), 
-                                            (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)],Long)] = 
+                                            (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)],Long,Long)] = 
   sflowSummary
-  .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) 
+  .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) 
                   =>  proto.equals("TCP") &
                       ( myPort.equals("21") |
                         alienPort.equals("21") ) 
          })
   .map({
-      case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) =>
-         val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)] = new HashSet()
-         flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime))
-        ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,1L))
+      case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) =>
+         val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)] = new HashSet()
+         flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate))
+        ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,1L,sampleRate))
       })
   
   val ftpTalkers =
   ftpTalkersCollection
   .reduceByKey({
-        case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB)) =>
-             (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB)
+        case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,sampleRateB)) =>
+             (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB,(sampleRateA+sampleRateB)/2)
               })
   .map({
-         case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows)) =>
+         case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,sampleRate)) =>
 
               println("FTP Communication "+myIP+ " <?> "+alienIP)
 
@@ -680,47 +725,47 @@ object HogSFlow {
   println("P2P Communication")
   
   val p2pTalkersCollection:PairRDDFunctions[(String,String), 
-                                            (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)],Long)] = 
+                                            (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)],Long,Long)] = 
   sflowSummary
-  .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) 
+  .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) 
                   =>  myPort.toInt > 10000 &
                       alienPort.toInt > 10000 &
                       numberPkts > 1
          })
   .map({
-      case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) =>
-         val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)] = new HashSet()
-         flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime))
-        ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,1L))
+      case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) =>
+         val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)] = new HashSet()
+         flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate))
+        ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,1L,sampleRate))
       })
   
   val p2pTalkers1st =
   p2pTalkersCollection
   .reduceByKey({
-        case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB)) =>
-             (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB)
+        case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,sampleRateB)) =>
+             (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB,(sampleRateA+sampleRateB)/2)
               })
   .filter({
-         case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows)) =>
+         case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,sampleRate)) =>
                !isMyIP(alienIP,myNets) & // Avoid internal communication
                !ftpTalkers.contains((myIP,alienIP)) // Avoid FTP communication
           })
   .map({
-         case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows)) =>
-              (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,1L))
+         case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,sampleRate)) =>
+              (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,1L,sampleRate))
       })
   .reduceByKey({
-          case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,pairsA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,pairsB)) =>
-               (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB, pairsA+pairsB)
+          case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,pairsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,pairsB,sampleRateB)) =>
+               (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB, pairsA+pairsB,(sampleRateA+sampleRateB)/2)
               })
-  .filter({ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,pairs)) =>
+  .filter({ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,pairs,sampleRate)) =>
                  pairs > p2pPairsThreshold &
                  flowSet
-                  .map({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime) => myPort})
+                  .map({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate) => myPort})
                   .toList.distinct.size > p2pMyPortsThreshold
          })
   .map({ 
-      case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs)) =>
+      case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs,sampleRate)) =>
          //p2pTalkers.add(myIP)
          
          println("MyIP: "+myIP+ " - P2P Communication, number of pairs: "+numberOfPairs)
@@ -745,9 +790,9 @@ object HogSFlow {
     
     
   println("P2P Communication - 2nd method")
-  val p2pTalkers2ndMethodCollection:PairRDDFunctions[(String,String), (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)],Long)] = 
+  val p2pTalkers2ndMethodCollection:PairRDDFunctions[(String,String), (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)],Long,Long)] = 
     sflowSummary
-    .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) 
+    .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) 
                   =>  proto.equals("UDP")     &
                       myPort.toInt < 10000    &
                       myPort.toInt > 1000     &
@@ -756,37 +801,37 @@ object HogSFlow {
                       numberPkts > 1
            })
     .map({
-      case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) =>
-         val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)] = new HashSet()
-         flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime))
-        ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,1L))
+      case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) =>
+         val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)] = new HashSet()
+         flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate))
+        ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,1L,sampleRate))
         })
   
   val p2pTalkers2nd = p2pTalkers2ndMethodCollection
   .reduceByKey({
-         case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB)) =>
-              (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB)
+         case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,sampleRateB)) =>
+              (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB,(sampleRateA+sampleRateB)/2)
               })
   .filter({
-         case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows)) =>
+         case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,sampleRate)) =>
                !isMyIP(alienIP,myNets) &
                !p2pTalkers1st.contains(myIP)
           })
   .map({
-         case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows)) =>
-              (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,1L))
+         case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,sampleRate)) =>
+              (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,1L,sampleRate))
       })
   .reduceByKey({
-         case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,pairsA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,pairsB)) =>
-              (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB, pairsA+pairsB)
+         case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,pairsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,pairsB,sampleRateB)) =>
+              (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB, pairsA+pairsB,(sampleRateA+sampleRateB)/2)
               })
-  .filter({ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,pairs)) =>
+  .filter({ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,pairs,sampleRate)) =>
                  pairs > p2pPairs2ndMethodThreshold &
                  flowSet.map(_._4).toList.distinct.size > p2pDistinctPorts2ndMethodThreshold &
                  bytesDown+bytesUp > p2pBytes2ndMethodThreshold
           })
     .map({
-      case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs)) =>
+      case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs,sampleRate)) =>
       
          //p2pTalkers.add(myIP)
          
@@ -815,9 +860,10 @@ object HogSFlow {
   
 
 
-  val mediaClientCollection:PairRDDFunctions[(String,String), (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)],Long,Long,Long)] = 
+  val mediaClientCollection:PairRDDFunctions[(String,String), (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)],
+                                            Long,Long,Long,Long)] = 
     sflowSummary
-    .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) 
+    .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) 
                   =>  proto.equals("TCP")     &
                       myPort.toInt < 10000    &
                       myPort.toInt > 1000     &
@@ -826,39 +872,39 @@ object HogSFlow {
                       numberPkts > 1
            })
     .map({
-      case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) =>
-           val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)] = new HashSet()
-           flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime))
-           ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,1L,beginTime,endTime))
+      case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) =>
+           val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)] = new HashSet()
+           flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate))
+           ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,1L,beginTime,endTime,sampleRate))
         })
   
   val mediaStreamingClients = 
   mediaClientCollection
   .reduceByKey({
-      case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,beginTimeA,endTimeA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,beginTimeB,endTimeB)) =>
-           (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB,beginTimeA.min(beginTimeB),endTimeA.max(endTimeB))
+      case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,beginTimeA,endTimeA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,beginTimeB,endTimeB,sampleRateB)) =>
+           (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB,beginTimeA.min(beginTimeB),endTimeA.max(endTimeB),(sampleRateA+sampleRateB)/2)
               })
   .filter({
-           case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,beginTime,endTime)) =>
+           case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,beginTime,endTime,sampleRate)) =>
                 !isMyIP(alienIP,myNets)  &
                 !p2pTalkers.contains(myIP) &
                 (endTime-beginTime) > mediaClientCommunicationDurationThreshold 
           })
   .map({
-          case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,beginTime,endTime)) =>
-               (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,1L))
+          case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,beginTime,endTime,sampleRate)) =>
+               (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,1L,sampleRate))
       })
   .reduceByKey({
-          case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,pairsA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,pairsB)) =>
-               (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB, pairsA+pairsB)
+          case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,pairsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,pairsB,sampleRateB)) =>
+               (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB, pairsA+pairsB,(sampleRateA+sampleRateB)/2)
               })
-  .filter({ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,pairs)) =>
+  .filter({ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,pairs,sampleRate)) =>
                  pairs     < mediaClientPairsThreshold  &
                  bytesUp   < mediaClientUploadThreshold &
                  bytesDown >= mediaClientDownloadThreshold
           })
     .map({ 
-      case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs)) =>
+      case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs,sampleRate)) =>
       
          println("MyIP: "+myIP+ " - Media streaming client, number of pairs: "+numberOfPairs)
                             
@@ -890,46 +936,47 @@ object HogSFlow {
   
 
   println("")
-  println("Atypical TCP/UDP port used")
+  println("Atypical TCP port used")
           
- val atypicalTCPCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)],
-                                             Map[String,Double],Long)] = 
+ val atypicalTCPCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)],
+                                             Map[String,Double],Long,Long)] = 
     sflowSummary
-    .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) 
+    .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) 
                   =>  direction  < 0 &
                       numberPkts > 1
            })
     .map({
-      case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) =>
-         val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)] = new HashSet()
-         flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime))
+      case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) =>
+         val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)] = new HashSet()
+         flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate))
          
          val histogram: Map[String,Double] = new HashMap()
          histogram.put(myPort,1D)
          
-        (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram,1L))
+        (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram,1L,sampleRate))
         
         })
   
   
      atypicalTCPCollection
      .reduceByKey({
-       case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,histogramA,numberOfFlowsA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,histogramB,numberOfFlowsB)) =>
+       case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,histogramA,numberOfFlowsA,sampleRateA),
+             (bytesUpB,bytesDownB,numberPktsB,flowSetB,histogramB,numberOfFlowsB,sampleRateB)) =>
       
                histogramB./:(0){case  (c,(key,qtdH))=> val qtdH2 = {if(histogramA.get(key).isEmpty) 0D else histogramA.get(key).get }
                                                         histogramA.put(key,  qtdH2 + qtdH) 
                                                         0
                                  }
-               (bytesUpA+bytesUpB, bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, histogramA, numberOfFlowsA+numberOfFlowsB)
+               (bytesUpA+bytesUpB, bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, histogramA, numberOfFlowsA+numberOfFlowsB,(sampleRateA+sampleRateB)/2)
             })
-     .map({ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram,numberOfFlows)) =>
+     .map({ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram,numberOfFlows,sampleRate)) =>
     
-                            (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram.map({ case (port,qtdC) => (port,qtdC/numberOfFlows.toDouble) }),numberOfFlows))
+                            (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram.map({ case (port,qtdC) => (port,qtdC/numberOfFlows.toDouble) }),numberOfFlows,sampleRate))
           })
-    .filter({case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram,numberOfFlows)) =>
+    .filter({case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram,numberOfFlows,sampleRate)) =>
                    !p2pTalkers.contains(myIP) // Avoid P2P talkers
            })
-    .foreach{case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram,numberOfFlows)) => 
+    .foreach{case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram,numberOfFlows,sampleRate)) => 
                     
                     val hogHistogram=HogHBaseHistogram.getHistogram("HIST01-"+myIP)
                     
@@ -977,9 +1024,10 @@ object HogSFlow {
   println("")
   println("Atypical alien TCP/UDP port used")
   
- val atypicalAlienTCPCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)],Map[String,Double],Long)] = 
+ val atypicalAlienTCPCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)],
+                                                  Map[String,Double],Long,Long)] = 
     sflowSummary
-    .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) 
+    .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) 
                   =>  numberPkts > 1           &
                       alienPort.toLong < 10000 &
                       direction > -1           &
@@ -989,55 +1037,65 @@ object HogSFlow {
                      // !ftpTalkers.contains((myIP,alienIP)) // Avoid FTP communication
            })
     .map({
-      case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) =>
-         val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)] = new HashSet()
-         flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime))
+      case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) =>
+         val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)] = new HashSet()
+         flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate))
          
          val histogram: Map[String,Double] = new HashMap()
          histogram.put(alienPort,1D)
          
-        (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram,1L))
+        (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram,1L,sampleRate))
         
         })
   
   
      atypicalAlienTCPCollection
      .reduceByKey({
-       case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,histogramA,numberOfFlowsA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,histogramB,numberOfFlowsB)) =>
+       case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,histogramA,numberOfFlowsA,sampleRateA),
+             (bytesUpB,bytesDownB,numberPktsB,flowSetB,histogramB,numberOfFlowsB,sampleRateB)) =>
       
                histogramB./:(0){case  (c,(key,qtdH))=> val qtdH2 = {if(histogramA.get(key).isEmpty) 0D else histogramA.get(key).get }
                                                         histogramA.put(key,  qtdH2 + qtdH) 
                                                         0
                                  }
-               (bytesUpA+bytesUpB, bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, histogramA, numberOfFlowsA+numberOfFlowsB)
+               (bytesUpA+bytesUpB, bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, histogramA, numberOfFlowsA+numberOfFlowsB,(sampleRateA+sampleRateB)/2)
             })
-     .map({ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram,numberOfFlows)) =>
+     .map({ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram,numberOfFlows,sampleRate)) =>
                  (myIP,(bytesUp,bytesDown,numberPkts,flowSet,
                       histogram.map({ case (port,qtdC) => (port,qtdC/numberOfFlows.toDouble) }),
-                      numberOfFlows))
+                      numberOfFlows,sampleRate))
           })
-    .filter({case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram,numberOfFlows)) =>
+    .filter({case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram,numberOfFlows,sampleRate)) =>
                    !p2pTalkers.contains(myIP) & // Avoid P2P talkers
                    !mediaStreamingClients.contains(myIP)  // Avoid media streaming clients
            })
-    .foreach{case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram,numberOfFlows)) => 
+    .foreach{case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram,numberOfFlows,sampleRate)) => 
                     
-                    val hogHistogram=HogHBaseHistogram.getHistogram("HIST02-"+myIP)
+                    val savedHogHistogram=HogHBaseHistogram.getHistogram("HIST02-"+myIP)
                     
-                    if(hogHistogram.histSize < 1000)
+                    if(savedHogHistogram.histSize < 1000)
                     {
                       //println("IP: "+dstIP+ "  (N:"+qtd+",S:"+hogHistogram.histSize+") - Learn More!")
-                      HogHBaseHistogram.saveHistogram(Histograms.merge(hogHistogram, new HogHistogram("",numberOfFlows,histogram)))
+                      HogHBaseHistogram.saveHistogram(Histograms.merge(savedHogHistogram, new HogHistogram("",numberOfFlows,histogram)))
                     }else
                     {
+                         val savedLastHogHistogram=HogHBaseHistogram.getHistogram("HIST02.1-"+myIP)
+                         
+                         if(savedLastHogHistogram.histSize > 0)
+                         {
+                           
                            //val KBDistance = Histograms.KullbackLiebler(hogHistogram.histMap, map)
-                           val atypical   = Histograms.atypical(hogHistogram.histMap, histogram)
+                           val atypical   = Histograms.atypical(savedHogHistogram.histMap, histogram)
+                           val typical   = Histograms.typical(savedLastHogHistogram.histMap, histogram)
 
                             val newAtypical = 
                             atypical.filter({ atypicalAlienPort =>
                                                {
+                                                  typical.contains(atypicalAlienPort)
+                                                }&
+                                                {
                                                   flowSet.filter(p => p._4.equals(atypicalAlienPort))
-                                                  .map({ case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime) => 
+                                                  .map({ case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate) => 
                                                              var savedAlienHistogram = new HogHistogram("",0,new HashMap[String,Double])
                                                              if(isMyIP(alienIP,myNets))
                                                              {
@@ -1057,11 +1115,12 @@ object HogSFlow {
                                                                  false // No! The Alien was accessed before by someone else. It's not an atypical flow.
                                                            }).contains(true)
                                                 }
+                                                
                                             })
                             
                             if(newAtypical.size>0)
                             {
-                            println("MyIP: "+myIP+ "  (N:"+numberOfFlows+",S:"+hogHistogram.histSize+") - Atypical alien ports: "+newAtypical.mkString(","))
+                            println("MyIP: "+myIP+ "  (N:"+numberOfFlows+",S:"+savedHogHistogram.histSize+") - Atypical alien ports: "+newAtypical.mkString(","))
                             
                             /*
                             println("Saved:")
@@ -1090,7 +1149,13 @@ object HogSFlow {
                     
                             populateAtypicalAlienTCPPortUsed(event).alert()
                           }
-                      HogHBaseHistogram.saveHistogram(Histograms.merge(hogHistogram, new HogHistogram("",numberOfFlows,histogram)))
+                           
+                          HogHBaseHistogram.saveHistogram(Histograms.merge(savedHogHistogram, savedLastHogHistogram)) 
+
+                         }
+                      
+                          
+                      HogHBaseHistogram.saveHistogram(new HogHistogram("HIST02.1-"+myIP,numberOfFlows,histogram))
                     }
                     
              }
@@ -1108,34 +1173,46 @@ object HogSFlow {
   println("")
   println("Atypical number of pairs in the period")
  
-  val atypicalNumberPairsCollection: PairRDDFunctions[(String,String), (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)],Long)] = 
+  val atypicalNumberPairsCollection: PairRDDFunctions[(String,String), (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)],Long,Long)] = 
     sflowSummary
     .map({
-      case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) =>
-         val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)] = new HashSet()
-         flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime))
-        ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,1L))
+      case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) =>
+         val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)] = new HashSet()
+         flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate))
+        ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,1L,sampleRate))
         })
   
+  val atypicalNumberPairsCollectionFinal=
   atypicalNumberPairsCollection
   .reduceByKey({
-    case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB)) =>
-      (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB)
+    case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,sampleRateB)) =>
+      (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB, (sampleRateA+sampleRateB)/2)
   })
   .map({
-     case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows)) =>
+     case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,sampleRate)) =>
     
-       (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,1L))
+       (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,1L,sampleRate))
   })
   .reduceByKey({
-    case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,pairsA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,pairsB)) =>
-      (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB, pairsA+pairsB)
+    case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,pairsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,pairsB,sampleRateB)) =>
+      (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB, pairsA+pairsB,(sampleRateA+sampleRateB)/2)
   })
-  .filter{case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs)) =>
-                   !p2pTalkers.contains(myIP) & // Avoid P2P talkers
+  .filter{case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs,sampleRate)) =>
+                   !p2pTalkers.contains(myIP)// Avoid P2P talkers
+           }.cache
+  
+  val pairsStats = 
+  atypicalNumberPairsCollectionFinal
+  .map({case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs,sampleRate)) =>
+    numberOfPairs
+      }).stats()
+  
+  
+  atypicalNumberPairsCollectionFinal
+  .filter{case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs,sampleRate)) =>
                    numberOfPairs > atypicalPairsThresholdMIN
            }
-  .foreach{case  (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs)) => 
+  .foreach{case  (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs,sampleRate)) => 
                     val savedHistogram=HogHBaseHistogram.getHistogram("HIST03-"+myIP)
                     
                     val histogram = new HashMap[String,Double]
@@ -1151,7 +1228,7 @@ object HogSFlow {
                           //val KBDistance = Histograms.KullbackLiebler(hogHistogram.histMap, map)
                           val atypical   = Histograms.atypical(savedHistogram.histMap, histogram)
 
-                          if(atypical.size>0 )
+                          if(atypical.size>0 & savedHistogram.histMap.filter({case (key,value) => value > 0.001D}).size <5)
                           {
                             println("MyIP: "+myIP+ "  (N:1,S:"+savedHistogram.histSize+") - Atypical number of pairs in the period: "+numberOfPairs)
                             
@@ -1165,6 +1242,8 @@ object HogSFlow {
                             event.data.put("bytesDown", bytesDown.toString)
                             event.data.put("numberPkts", numberPkts.toString)
                             event.data.put("stringFlows", setFlows2String(flowSet))
+                            event.data.put("pairsMean", pairsStats.mean.toString)
+                            event.data.put("pairsStdev", pairsStats.stdev.toString)
                             
                             populateAtypicalNumberOfPairs(event).alert()
                           }
@@ -1184,39 +1263,52 @@ object HogSFlow {
   println("")
   println("Atypical amount of data transfered")
   
-  val atypicalAmountDataCollection: PairRDDFunctions[(String,String), (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)],Long)] = 
+  val atypicalAmountDataCollection: PairRDDFunctions[(String,String), (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)]
+                                                      ,Long,Long)] = 
     sflowSummary
-    .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) 
+    .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) 
                   =>  //alienPort.toLong < 1204  &&
                       direction > -1       &
                       myPort.toLong > 1024 &
                       !myPort.equals("8080")
            })
     .map({
-          case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) =>
-               val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)] = new HashSet()
-               flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime))
-               ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,1L))
+          case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) =>
+               val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)] = new HashSet()
+               flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate))
+               ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,1L,sampleRate))
         })
   
+  val atypicalAmountDataCollectionFinal =
   atypicalAmountDataCollection
   .reduceByKey({
-                case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB)) =>
-                     (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB)
+                case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,sampleRateB)) =>
+                     (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB,(sampleRateA+sampleRateB)/2)
               })
   .map({
-     case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows)) =>
-          (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,1L))
+     case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,sampleRate)) =>
+          (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,1L,sampleRate))
   })
   .reduceByKey({
-    case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,pairsA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,pairsB)) =>
-         (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB, pairsA+pairsB)
+    case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,pairsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,pairsB,sampleRateB)) =>
+         (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB, pairsA+pairsB,(sampleRateA+sampleRateB)/2)
   })
-  .filter{case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs)) =>
-               !p2pTalkers.contains(myIP) & // Avoid P2P talkers
-               bytesUp > atypicalAmountDataThresholdMIN
+  .filter{case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs,sampleRate)) =>
+               !p2pTalkers.contains(myIP)  // Avoid P2P talkers
+         }.cache
+  
+  val dataStats = 
+  atypicalAmountDataCollectionFinal
+  .map({case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs,sampleRate)) =>
+        bytesUp
+      }).stats()
+  
+  
+  atypicalAmountDataCollectionFinal
+  .filter{case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs,sampleRate)) =>
+               bytesUp*sampleRate > atypicalAmountDataThresholdMIN
          }
-  .foreach{case  (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs)) => 
+  .foreach{case  (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs,sampleRate)) => 
                     
                     val savedHistogram=HogHBaseHistogram.getHistogram("HIST04-"+myIP)
                     
@@ -1247,6 +1339,8 @@ object HogSFlow {
                             event.data.put("bytesDown", bytesDown.toString)
                             event.data.put("numberPkts", numberPkts.toString)
                             event.data.put("stringFlows", setFlows2String(flowSet))
+                            event.data.put("dataMean", dataStats.mean.toString)
+                            event.data.put("dataStdev", dataStats.stdev.toString)
                             
                             populateAtypicalAmountData(event).alert()
                           }
@@ -1268,42 +1362,43 @@ object HogSFlow {
   println("")
   println("Atypical TCP/UDP port used by Alien Network")
           
- val atypicalAlienReverseTCPCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)],Map[String,Double],Long)] = 
+ val atypicalAlienReverseTCPCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)],
+                                                        Map[String,Double],Long,Long)] = 
     sflowSummary
-    .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) 
+    .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) 
                   =>  numberPkts  >1   &
                       !isMyIP(alienIP,myNets) &  // Flow InternalIP <-> ExternalIP
                       !p2pTalkers.contains(myIP) // Avoid P2P communication
            })
     .map({
-      case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) =>
-         val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)] = new HashSet()
-         flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime))
+      case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) =>
+         val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)] = new HashSet()
+         flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate))
          
          val histogram: Map[String,Double] = new HashMap()
          histogram.put(alienPort,1D)
          
-        (ipSignificantNetwork(alienIP),(bytesUp,bytesDown,numberPkts,flowSet,histogram,1L))
+        (ipSignificantNetwork(alienIP),(bytesUp,bytesDown,numberPkts,flowSet,histogram,1L,sampleRate))
         
         })
   
   
      atypicalAlienReverseTCPCollection
      .reduceByKey({
-       case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,histogramA,numberOfFlowsA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,histogramB,numberOfFlowsB)) =>
+       case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,histogramA,numberOfFlowsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,histogramB,numberOfFlowsB,sampleRateB)) =>
       
                histogramB./:(0){case  (c,(key,qtdH))=> val qtdH2 = {if(histogramA.get(key).isEmpty) 0D else histogramA.get(key).get }
                                                         histogramA.put(key,  qtdH2 + qtdH) 
                                                         0
                                  }
-               (bytesUpA+bytesUpB, bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, histogramA, numberOfFlowsA+numberOfFlowsB)
+               (bytesUpA+bytesUpB, bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, histogramA, numberOfFlowsA+numberOfFlowsB,(sampleRateA+sampleRateB)/2)
             })
-     .map({ case (alienNetwork,(bytesUp,bytesDown,numberPkts,flowSet,histogram,numberOfFlows)) =>
+     .map({ case (alienNetwork,(bytesUp,bytesDown,numberPkts,flowSet,histogram,numberOfFlows,sampleRate)) =>
                  (alienNetwork,(bytesUp,bytesDown,numberPkts,flowSet,
                      histogram.map({ case (port,qtdC) => (port,qtdC/numberOfFlows.toDouble) }),
-                     numberOfFlows))
+                     numberOfFlows,sampleRate))
           })
-    .foreach{case (alienNetwork,(bytesUp,bytesDown,numberPkts,flowSet,histogram,numberOfFlows)) => 
+    .foreach{case (alienNetwork,(bytesUp,bytesDown,numberPkts,flowSet,histogram,numberOfFlows,sampleRate)) => 
                     
                     val savedHogHistogram=HogHBaseHistogram.getHistogram("HIST05-"+alienNetwork)
                     
@@ -1353,33 +1448,34 @@ object HogSFlow {
   println("Aliens accessing more than "+alienThreshold+" hosts")
  
   
-   val alienTooManyPairsCollection: PairRDDFunctions[(String,String), (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)],Long)] = 
+   val alienTooManyPairsCollection: PairRDDFunctions[(String,String), (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)],
+                                                     Long,Long)] = 
     sflowSummary
-    .filter({ case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) 
+    .filter({ case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) 
                  => direction < 0  &
                     !isMyIP(alienIP,myNets)
             })
     .map({
-      case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) =>
-         val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)] = new HashSet()
-         flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime))
-        ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,1L))
+      case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) =>
+         val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)] = new HashSet()
+         flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate))
+        ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,1L,sampleRate))
         })
   
   alienTooManyPairsCollection
   .reduceByKey({
-       case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB)) =>
-            (bytesUpA+bytesUpB, bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB)
+       case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,sampleRateB)) =>
+            (bytesUpA+bytesUpB, bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB, (sampleRateA+sampleRateB)/2)
               })
   .map({
-       case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows)) =>
-            (alienIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,1L))
+       case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,sampleRate)) =>
+            (alienIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,1L,sampleRate))
       })
   .reduceByKey({
-       case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,pairsA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,pairsB)) =>
-            (bytesUpA+bytesUpB, bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB, pairsA+pairsB)
+       case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,pairsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,pairsB,sampleRateB)) =>
+            (bytesUpA+bytesUpB, bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB, pairsA+pairsB, (sampleRateA+sampleRateB)/2)
   })
-  .foreach{case  (alienIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs)) => 
+  .foreach{case  (alienIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs,sampleRate)) => 
                     if(numberOfPairs > alienThreshold && !alienIP.equals("0.0.0.0") )
                     {                     
                             println("AlienIP: "+alienIP+ " more than "+alienThreshold+" pairs in the period: "+numberOfPairs)
@@ -1408,8 +1504,10 @@ object HogSFlow {
   println("")
   println("UDP amplifier (DDoS)")
   
-   val udpAmplifierCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)],Long)] = sflowSummary
-    .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) 
+   val udpAmplifierCollection: PairRDDFunctions[String, 
+                                                (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)],
+                                                Long,Long)] = sflowSummary
+    .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) 
                   => (  myPort.equals("19")   |
                         myPort.equals("53")   |
                         myPort.equals("123")  |
@@ -1420,27 +1518,27 @@ object HogSFlow {
                       !isMyIP(alienIP,myNets)                      
            })
     .map({
-          case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) =>
-               val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)] = new HashSet()
-               flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime))
-               (myIP,(bytesUp,bytesDown,numberPkts,flowSet,1L))
+          case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) =>
+               val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)] = new HashSet()
+               flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate))
+               (myIP,(bytesUp,bytesDown,numberPkts,flowSet,1L,sampleRate))
         })
   
   
   udpAmplifierCollection
     .reduceByKey({
-                   case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,connectionsA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,connectionsB)) =>
-                        (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, connectionsA+connectionsB)
+                   case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,connectionsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,connectionsB,sampleRateB)) =>
+                        (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, connectionsA+connectionsB,(sampleRateA+sampleRateB)/2)
                 })
-    .filter({ case  (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections)) => 
+    .filter({ case  (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) => 
                     numberPkts>1000
            })
     .sortBy({ 
-              case   (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections)) =>    bytesUp  
+              case   (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) =>    bytesUp  
             }, false, 15
            )
   .take(100)
-  .foreach{ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections)) => 
+  .foreach{ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) => 
                     println("("+myIP+","+bytesUp+")" ) 
                     val flowMap: Map[String,String] = new HashMap[String,String]
                     flowMap.put("flow:id",System.currentTimeMillis.toString)
@@ -1466,8 +1564,8 @@ object HogSFlow {
    
   println("")
   println("Abused SMTP Server")
-   val abusedSMTPCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)],Long)] = sflowSummary
-    .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) 
+   val abusedSMTPCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)],Long,Long)] = sflowSummary
+    .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) 
                   =>  
                       ( myPort.equals("465") |
                         myPort.equals("587")
@@ -1476,28 +1574,28 @@ object HogSFlow {
                       !isMyIP(alienIP,myNets) 
            })
     .map({
-          case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime)) =>
-               val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long)] = new HashSet()
-               flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime))
-               (myIP,(bytesUp,bytesDown,numberPkts,flowSet,1L))
+          case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) =>
+               val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)] = new HashSet()
+               flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate))
+               (myIP,(bytesUp,bytesDown,numberPkts,flowSet,1L,sampleRate))
         })
   
   
   abusedSMTPCollection
     .reduceByKey({
-                   case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,connectionsA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,connectionsB)) =>
-                        (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, connectionsA+connectionsB)
+                   case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,connectionsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,connectionsB,sampleRateB)) =>
+                        (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, connectionsA+connectionsB,(sampleRateA+sampleRateB)/2)
                 })
-    .filter({ case  (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections)) => 
+    .filter({ case  (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) => 
                     connections>150 &
-                    bytesDown > abusedSMTPBytesThreshold
+                    bytesDown*sampleRate > abusedSMTPBytesThreshold
            })
     .sortBy({ 
-              case   (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections)) =>    bytesDown  
+              case   (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) =>    bytesDown  
             }, false, 15
            )
   .take(100)
-  .foreach{ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections)) => 
+  .foreach{ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) => 
                     println("("+myIP+","+bytesUp+")" ) 
                     val flowMap: Map[String,String] = new HashMap[String,String]
                     flowMap.put("flow:id",System.currentTimeMillis.toString)
@@ -1514,6 +1612,60 @@ object HogSFlow {
                     populateAbusedSMTP(event).alert()
            }
    
+ 
+   /*
+   * 
+   *  DNS tunnels
+   * 
+   */
+   
+  println("")
+  println("DNS tunnels")
+  val dnsTunnelCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)],Long,Long)] =
+  sflowSummary
+  .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) 
+                  =>  
+                      alienPort.equals("53") &
+                      proto.equals("UDP")  &
+                      (bytesUp+bytesDown)*sampleRate > dnsTunnelThreshold &
+                      !isMyIP(alienIP,myNets) 
+           })
+    .map({
+          case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) =>
+               val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)] = new HashSet()
+               flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate))
+               (myIP,(bytesUp,bytesDown,numberPkts,flowSet,1L,sampleRate))
+        })
+  
+  
+  dnsTunnelCollection
+    .reduceByKey({
+                   case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,connectionsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,connectionsB,sampleRateB)) =>
+                        (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, connectionsA+connectionsB,(sampleRateA+sampleRateB)/2)
+                })
+    .sortBy({ 
+              case   (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) =>    bytesUp+bytesDown  
+            }, false, 15
+           )
+  .take(30)
+  .foreach{ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) => 
+                    println("("+myIP+","+bytesUp+")" ) 
+                    val flowMap: Map[String,String] = new HashMap[String,String]
+                    flowMap.put("flow:id",System.currentTimeMillis.toString)
+                    val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(myIP),
+                                                                 InetAddress.getByName("255.255.255.255").getAddress))
+                    
+                    event.data.put("hostname", myIP)
+                    event.data.put("bytesUP", bytesUp.toString)
+                    event.data.put("bytesDown", bytesDown.toString)
+                    event.data.put("numberPkts", numberPkts.toString)
+                    event.data.put("connections", connections.toString)
+                    event.data.put("stringFlows", setFlows2String(flowSet.filter({p => p._4.equals("53")}))) // 4: alienPort
+                    
+                    populateDNSTunnel(event).alert()
+           }
+   
   }
-
+  
+  
 }

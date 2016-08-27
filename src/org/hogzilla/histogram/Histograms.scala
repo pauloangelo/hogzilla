@@ -13,6 +13,8 @@ import scala.math.log
 object Histograms {
 
   
+  val atypicalThreshold = 0.000001D
+  
   def KullbackLiebler(histogram1:Map[String,Double],histogram2:Map[String,Double]):Double = 
   {
         
@@ -38,8 +40,6 @@ object Histograms {
   {
     
     val ret = new HashSet[String] 
-    
-    val atypicalThreshold = 0.000001D
         
     val keys = histogram2.keySet
     
@@ -47,6 +47,29 @@ object Histograms {
                   val p:Double = { if(histogram1.get(key).isEmpty) 0 else histogram1.get(key).get }
                   val q:Double = { if(histogram2.get(key).isEmpty) 0 else histogram2.get(key).get }
                   if(p<atypicalThreshold && q>atypicalThreshold)
+                  {
+                   ret.add(key)
+                   ac+1
+                  }
+                  else
+                   0
+                }
+    
+    ret
+  }
+  
+  // Return typical events in histogram1 (main saved), which occurred in histogram2 (current)  
+  def typical(histogram1:Map[String,Double],histogram2:Map[String,Double]):Set[String] = 
+  {
+    
+    val ret = new HashSet[String] 
+    
+    val keys = histogram2.keySet
+    
+    keys./:(0.0){ case (ac,key) =>
+                  val p:Double = { if(histogram1.get(key).isEmpty) 0 else histogram1.get(key).get }
+                  val q:Double = { if(histogram2.get(key).isEmpty) 0 else histogram2.get(key).get }
+                  if(p>atypicalThreshold && q>atypicalThreshold)
                   {
                    ret.add(key)
                    ac+1
