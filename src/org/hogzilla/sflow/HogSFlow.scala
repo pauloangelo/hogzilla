@@ -943,7 +943,8 @@ object HogSFlow {
     sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) 
                   =>  direction  < 0 &
-                      numberPkts > 1
+                      numberPkts > 1 &
+                      !ftpTalkers.contains((myIP,alienIP))
            })
     .map({
       case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) =>
@@ -1033,8 +1034,8 @@ object HogSFlow {
                       direction > -1           &
                       myPort.toLong > 1024     &
                       !myPort.equals("8080")   &
-                      !isMyIP(alienIP,myNets) // &
-                     // !ftpTalkers.contains((myIP,alienIP)) // Avoid FTP communication
+                      !isMyIP(alienIP,myNets)  &
+                      !ftpTalkers.contains((myIP,alienIP)) // Avoid FTP communication
            })
     .map({
       case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) =>
@@ -1092,7 +1093,9 @@ object HogSFlow {
                             atypical.filter({ atypicalAlienPort =>
                                                {
                                                   typical.contains(atypicalAlienPort)
-                                                }&
+                                                }
+                                               /*
+                                               &
                                                 {
                                                   flowSet.filter(p => p._4.equals(atypicalAlienPort))
                                                   .map({ case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate) => 
@@ -1115,7 +1118,7 @@ object HogSFlow {
                                                                  false // No! The Alien was accessed before by someone else. It's not an atypical flow.
                                                            }).contains(true)
                                                 }
-                                                
+                                                */
                                             })
                             
                             if(newAtypical.size>0)

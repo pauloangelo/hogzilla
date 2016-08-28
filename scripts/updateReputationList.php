@@ -139,7 +139,7 @@ try
        $mutations[] = new Hbase\Mutation($dataListType);
        $mutations[] = new Hbase\Mutation($dataListDesc);
        // Insert mutations
-       $client->mutateRow("hogzilla_reputation", $ip, $mutations, array());
+       $client->mutateRow("hogzilla_reputation", $ip."-".$listName."-".$listType, $mutations, array());
     }
 } catch(Exception $e) 
 {
