@@ -651,14 +651,14 @@ object HogSFlow {
           }, false, 15
          )
   //.take(5000+whiteSMTPTalkers.size)
-  //.filter({ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) => 
-  //                 {  
- //                    !whiteSMTPTalkers.map { net => if( myIP.startsWith(net) )
-  //                                                    { true } else{false} 
-  //                                         }.contains(true) &
-  //                   connections > 1 // Consider just MyIPs that generated more than 2 SMTP connections
-  //                 }
-  //        })
+  .filter({ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) => 
+                   {  
+                     !whiteSMTPTalkers.map { net => if( myIP.startsWith(net) )
+                                                      { true } else{false} 
+                                           }.contains(true) &
+                     connections > 1 // Consider just MyIPs that generated more than 2 SMTP connections
+                   }
+          })
   .take(30)
   .foreach{ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) => 
                     println("("+myIP+","+bytesUp+")" ) 
@@ -668,7 +668,7 @@ object HogSFlow {
                                                                  InetAddress.getByName("255.255.255.255").getAddress))
                     
                     event.data.put("hostname", myIP)
-                    event.data.put("bytesUP", bytesUp.toString)
+                    event.data.put("bytesUp", bytesUp.toString)
                     event.data.put("bytesDown", bytesDown.toString)
                     event.data.put("numberPkts", numberPkts.toString)
                     event.data.put("connections", connections.toString)
@@ -1242,8 +1242,8 @@ object HogSFlow {
                             event.data.put("bytesDown", bytesDown.toString)
                             event.data.put("numberPkts", numberPkts.toString)
                             event.data.put("stringFlows", setFlows2String(flowSet))
-                            event.data.put("pairsMean", pairsStats.mean.toString)
-                            event.data.put("pairsStdev", pairsStats.stdev.toString)
+                            event.data.put("pairsMean", pairsStats.mean.round.toString)
+                            event.data.put("pairsStdev", pairsStats.stdev.round.toString)
                             
                             populateAtypicalNumberOfPairs(event).alert()
                           }
@@ -1316,7 +1316,7 @@ object HogSFlow {
                     val key = floor(log(bytesUp.*(0.0001)+1D)).toString
                     histogram.put(key, 1D)
                     
-                    if(savedHistogram.histSize< 10)
+                    if(savedHistogram.histSize< 30 )
                     {
                       //println("MyIP: "+myIP+ "  (N:1,S:"+hogHistogram.histSize+") - Learn More!")
                       HogHBaseHistogram.saveHistogram(Histograms.merge(savedHistogram, new HogHistogram("",1L,histogram)))
@@ -1325,7 +1325,7 @@ object HogSFlow {
                           //val KBDistance = Histograms.KullbackLiebler(hogHistogram.histMap, map)
                           val atypical   = Histograms.atypical(savedHistogram.histMap, histogram)
 
-                          if(atypical.size>0 )
+                          if(atypical.size>0 & savedHistogram.histMap.filter({case (key,value) => value > 0.001D}).size <5)
                           {
                              println("MyIP: "+myIP+ "  (N:1,S:"+savedHistogram.histSize+") - Atypical amount of sent bytes: "+bytesUp)
                             
@@ -1339,8 +1339,8 @@ object HogSFlow {
                             event.data.put("bytesDown", bytesDown.toString)
                             event.data.put("numberPkts", numberPkts.toString)
                             event.data.put("stringFlows", setFlows2String(flowSet))
-                            event.data.put("dataMean", dataStats.mean.toString)
-                            event.data.put("dataStdev", dataStats.stdev.toString)
+                            event.data.put("dataMean", dataStats.mean.round.toString)
+                            event.data.put("dataStdev", dataStats.stdev.round.toString)
                             
                             populateAtypicalAmountData(event).alert()
                           }
