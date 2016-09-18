@@ -109,8 +109,8 @@ object HogSFlow {
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
                   "Abnormal behaviour: Large amount of sent data (>"+threshold+")\n"+
                   "IP: "+hostname+"\n"+
-                  "Bytes Up: "+bytesUp+"\n"+
-                  "Bytes Down: "+bytesDown+"\n"+
+                  "Bytes Up: "+humanBytes(bytesUp)+"\n"+
+                  "Bytes Down: "+humanBytes(bytesDown)+"\n"+
                   "Packets: "+numberPkts+"\n"+
                   "Flows"+stringFlows
                     
@@ -130,8 +130,8 @@ object HogSFlow {
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
                   "Abnormal behaviour: SMTP communication\n"+
                   "IP: "+hostname+"\n"+
-                  "Bytes Up: "+bytesUp+"\n"+
-                  "Bytes Down: "+bytesDown+"\n"+
+                  "Bytes Up: "+humanBytes(bytesUp)+"\n"+
+                  "Bytes Down: "+humanBytes(bytesDown)+"\n"+
                   "Packets: "+numberPkts+"\n"+
                   "Connections: "+connections+"\n"+
                   "Flows"+stringFlows
@@ -153,8 +153,8 @@ object HogSFlow {
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
                   "Abnormal behaviour: Atypical TCP/UDP port used ("+tcpport+")\n"+
                   "IP: "+myIP+"\n"+
-                  "Bytes Up: "+bytesUp+"\n"+
-                  "Bytes Down: "+bytesDown+"\n"+
+                  "Bytes Up: "+humanBytes(bytesUp)+"\n"+
+                  "Bytes Down: "+humanBytes(bytesDown)+"\n"+
                   "Packets: "+numberPkts+"\n"+
                   "Flows"+stringFlows
                   
@@ -176,8 +176,8 @@ object HogSFlow {
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
                   "Abnormal behaviour: Atypical alien TCP/UDP port used ("+tcpport+")\n"+
                   "IP: "+myIP+"\n"+
-                  "Bytes Up: "+bytesUp+"\n"+
-                  "Bytes Down: "+bytesDown+"\n"+
+                  "Bytes Up: "+humanBytes(bytesUp)+"\n"+
+                  "Bytes Down: "+humanBytes(bytesDown)+"\n"+
                   "Total packets: "+numberPkts+"\n"+
                   "Flows matching the atypical ports"+stringFlows
                   
@@ -201,8 +201,8 @@ object HogSFlow {
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
                   "Abnormal behaviour: Atypical number of pairs in the period ("+numberOfPairs+")\n"+
                   "IP: "+myIP+"\n"+
-                  "Bytes Up: "+bytesUp+"\n"+
-                  "Bytes Down: "+bytesDown+"\n"+
+                  "Bytes Up: "+humanBytes(bytesUp)+"\n"+
+                  "Bytes Down: "+humanBytes(bytesDown)+"\n"+
                   "Packets: "+numberPkts+"\n"+
                   "Number of pairs: "+numberOfPairs+"\n"+
                   "Pairs Mean/Stddev (all MyHosts): "+pairsMean+"/"+pairsStdev+"\n"+
@@ -226,9 +226,9 @@ object HogSFlow {
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
                   "Abnormal behaviour: Atypical amount of data uploaded ("+bytesUp+" bytes)\n"+
                   "IP: "+myIP+"\n"+
-                  "Bytes Up: "+bytesUp+"\n"+
-                  "Bytes Down: "+bytesDown+"\n"+
-                  "Bytes Up Mean/Stddev (all MyHosts): "+dataMean+"/"+dataStdev+"\n"+
+                  "Bytes Up: "+humanBytes(bytesUp)+"\n"+
+                  "Bytes Down: "+humanBytes(bytesDown)+"\n"+
+                  "Bytes Up Mean/Stddev (all MyHosts): "+humanBytes(dataMean)+"/"+humanBytes(dataStdev)+"\n"+
                   "Packets: "+numberPkts+"\n"+
                   "Number of pairs: "+numberOfPairs+"\n"+
                   "Flows"+stringFlows
@@ -250,8 +250,8 @@ object HogSFlow {
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
                   "Abnormal behaviour: Alien accessing too much hosts ("+numberOfPairs+")\n"+
                   "AlienIP: "+alienIP+"\n"+
-                  "Bytes Up: "+bytesUp+"\n"+
-                  "Bytes Down: "+bytesDown+"\n"+
+                  "Bytes Up: "+humanBytes(bytesUp)+"\n"+
+                  "Bytes Down: "+humanBytes(bytesDown)+"\n"+
                   "Packets: "+numberPkts+"\n"+
                   "Number of pairs: "+numberOfPairs+"\n"+
                   "Flows"+stringFlows
@@ -273,8 +273,8 @@ object HogSFlow {
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
                   "Abnormal behaviour: P2P Communication\n"+
                   "MyIP: "+myIP+"\n"+
-                  "Bytes Up: "+bytesUp+"\n"+
-                  "Bytes Down: "+bytesDown+"\n"+
+                  "Bytes Up: "+humanBytes(bytesUp)+"\n"+
+                  "Bytes Down: "+humanBytes(bytesDown)+"\n"+
                   "Packets: "+numberPkts+"\n"+
                   "Number of pairs: "+numberOfPairs+"\n"+
                   "Flows"+stringFlows
@@ -295,8 +295,8 @@ object HogSFlow {
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
                   "Abnormal behaviour: Host is sending too many big UDP packets. May be a DDoS.\n"+
                   "IP: "+hostname+"\n"+
-                  "Bytes Up: "+bytesUp+"\n"+
-                  "Bytes Down: "+bytesDown+"\n"+
+                  "Bytes Up: "+humanBytes(bytesUp)+"\n"+
+                  "Bytes Down: "+humanBytes(bytesDown)+"\n"+
                   "Packets: "+numberPkts+"\n"+
                   "Connections: "+connections+"\n"+
                   "Flows"+stringFlows
@@ -317,8 +317,8 @@ object HogSFlow {
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
                   "Abnormal behaviour: Host is receiving too many e-mail submissions. May be an abused SMTP server. \n"+
                   "IP: "+hostname+"\n"+
-                  "Bytes Up: "+bytesUp+"\n"+
-                  "Bytes Down: "+bytesDown+"\n"+
+                  "Bytes Up: "+humanBytes(bytesUp)+"\n"+
+                  "Bytes Down: "+humanBytes(bytesDown)+"\n"+
                   "Packets: "+numberPkts+"\n"+
                   "Connections: "+connections+"\n"+
                   "Flows"+stringFlows
@@ -341,8 +341,8 @@ object HogSFlow {
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
                   "Abnormal behaviour: Appears to be a media streaming client.\n"+
                   "IP: "+hostname+"\n"+
-                  "Bytes Up: "+bytesUp+"\n"+
-                  "Bytes Down: "+bytesDown+"\n"+
+                  "Bytes Up: "+humanBytes(bytesUp)+"\n"+
+                  "Bytes Down: "+humanBytes(bytesDown)+"\n"+
                   "Packets: "+numberPkts+"\n"+
                   "Connections: "+connections+"\n"+
                   "Flows"+stringFlows
@@ -364,8 +364,8 @@ object HogSFlow {
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
                   "Abnormal behaviour: Host has DNS communication with large amount of data. \n"+
                   "IP: "+hostname+"\n"+
-                  "Bytes Up: "+bytesUp+"\n"+
-                  "Bytes Down: "+bytesDown+"\n"+
+                  "Bytes Up: "+humanBytes(bytesUp)+"\n"+
+                  "Bytes Down: "+humanBytes(bytesDown)+"\n"+
                   "Packets: "+numberPkts+"\n"+
                   "Connections: "+connections+"\n"+
                   "Flows"+stringFlows
@@ -385,15 +385,15 @@ object HogSFlow {
                           if(direction1>0)
                           {
                            c+"\n"+
-                           srcIP1+":"+srcPort1+" => "+dstIP1+":"+dstPort1+"  ("+proto1+", Upload: "+bytesUP+" bytes, Download: "+bytesDOWN+" bytes,"+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s, sampling rate: 1/"+sampleRate+")"
+                           srcIP1+":"+srcPort1+" => "+dstIP1+":"+dstPort1+"  ("+proto1+", Upload: "+humanBytes(bytesUP)+", Download: "+humanBytes(bytesDOWN)+","+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s, sampling rate: 1/"+sampleRate+")"
                           }else if(direction1<0)
                           {  
                            c+"\n"+
-                           srcIP1+":"+srcPort1+" <= "+dstIP1+":"+dstPort1+"  ("+proto1+", Download: "+bytesUP+" bytes, Upload: "+bytesDOWN+" bytes,"+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s, sampling rate: 1/"+sampleRate+")"
+                           srcIP1+":"+srcPort1+" <= "+dstIP1+":"+dstPort1+"  ("+proto1+", Download: "+humanBytes(bytesUP)+", Upload: "+humanBytes(bytesDOWN)+","+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s, sampling rate: 1/"+sampleRate+")"
                           }else
                           {  
                            c+"\n"+
-                           srcIP1+":"+srcPort1+" <?> "+dstIP1+":"+dstPort1+"  ("+proto1+", Left-to-right: "+bytesUP+" bytes, Right-to-left: "+bytesDOWN+" bytes,"+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s, sampling rate: 1/"+sampleRate+")"
+                           srcIP1+":"+srcPort1+" <?> "+dstIP1+":"+dstPort1+"  ("+proto1+", Left-to-right: "+humanBytes(bytesUP)+", Right-to-left: "+humanBytes(bytesDOWN)+","+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s, sampling rate: 1/"+sampleRate+")"
                           }
                     })
   }
@@ -426,6 +426,17 @@ object HogSFlow {
       
     ip
   }
+  
+   def humanBytes(b:Any):String =
+   {
+    val bytes=b.toString().toLong
+    val unit = 1024L
+    if (bytes < unit) return bytes + " B";
+    val exp = (log(bytes) / log(unit)).toInt;
+    val pre = "KMGTPE".charAt(exp-1)
+    "%.1f %sB".format(bytes / math.pow(unit, exp), pre);
+  }
+  
   
   /**
    * 
@@ -569,7 +580,11 @@ object HogSFlow {
   println("Top Talkers (bytes):")
   
   val topTalkerCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)],Long)] = 
-  sflowSummary.map({
+  sflowSummary
+     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) =>
+                  !isMyIP(alienIP, myNets)
+             })
+     .map({
                   case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) =>
                        val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)] = new HashSet()
                        flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate))
@@ -630,7 +645,7 @@ object HogSFlow {
     sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) 
                   =>  alienPort.equals("25") &  
-                      numberPkts>5 &
+                      numberPkts>3 &
                       !isMyIP(alienIP,myNets) // Exclude internal communication
            })
     .map({
@@ -650,16 +665,18 @@ object HogSFlow {
               case   (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) =>    bytesUp  
           }, false, 15
          )
-  //.take(5000+whiteSMTPTalkers.size)
   .filter({ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) => 
                    {  
-                     !whiteSMTPTalkers.map { net => if( myIP.startsWith(net) )
+                     /*!whiteSMTPTalkers.map { net => if( myIP.startsWith(net) )
                                                       { true } else{false} 
-                                           }.contains(true) &
+                                           }.contains(true)*/ 
+                     val savedLastHogHistogram=HogHBaseHistogram.getHistogram("HIST01-"+myIP)
+                     
+                     !Histograms.isTypicalEvent(savedLastHogHistogram.histMap, "25")  & // Exclude SMTP servers
                      connections > 1 // Consider just MyIPs that generated more than 2 SMTP connections
                    }
           })
-  .take(30)
+  .take(100)
   .foreach{ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) => 
                     println("("+myIP+","+bytesUp+")" ) 
                     val flowMap: Map[String,String] = new HashMap[String,String]
@@ -943,8 +960,8 @@ object HogSFlow {
     sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) 
                   =>  direction  < 0 &
-                      numberPkts > 1 &
-                      !ftpTalkers.contains((myIP,alienIP))
+                      !ftpTalkers.contains((myIP,alienIP)) &
+                      ( numberPkts > 1  ) // TODO: Implement PSH flags... 
            })
     .map({
       case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) =>
@@ -1035,8 +1052,9 @@ object HogSFlow {
                       myPort.toLong > 1024     &
                       !myPort.equals("8080")   &
                       !isMyIP(alienIP,myNets)  &
-                      !ftpTalkers.contains((myIP,alienIP)) // Avoid FTP communication
-           })
+                      !ftpTalkers.contains((myIP,alienIP)) &// Avoid FTP communication
+                      proto.equals("TCP")
+           })         
     .map({
       case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) =>
          val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)] = new HashSet()
@@ -1093,9 +1111,7 @@ object HogSFlow {
                             atypical.filter({ atypicalAlienPort =>
                                                {
                                                   typical.contains(atypicalAlienPort)
-                                                }
-                                               /*
-                                               &
+                                                } &
                                                 {
                                                   flowSet.filter(p => p._4.equals(atypicalAlienPort))
                                                   .map({ case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate) => 
@@ -1118,7 +1134,6 @@ object HogSFlow {
                                                                  false // No! The Alien was accessed before by someone else. It's not an atypical flow.
                                                            }).contains(true)
                                                 }
-                                                */
                                             })
                             
                             if(newAtypical.size>0)
@@ -1521,8 +1536,8 @@ object HogSFlow {
                         myPort.equals("123")  |
                         myPort.equals("1900")
                       ) &
-                      proto.equals("UDP") &
-                      bytesUp>800         &
+                      proto.equals("UDP")      &
+                      bytesUp*sampleRate>800   &
                       !isMyIP(alienIP,myNets)                      
            })
     .map({
@@ -1572,7 +1587,7 @@ object HogSFlow {
    
   println("")
   println("Abused SMTP Server")
-   val abusedSMTPCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)],Long,Long)] = sflowSummary
+   val abusedSMTPCollection: PairRDDFunctions[(String, String), (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)],Long,Long)] = sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) 
                   =>  
                       ( myPort.equals("465") |
@@ -1585,7 +1600,7 @@ object HogSFlow {
           case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) =>
                val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)] = new HashSet()
                flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate))
-               (myIP,(bytesUp,bytesDown,numberPkts,flowSet,1L,sampleRate))
+               ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,1L,sampleRate))
         })
   
   
@@ -1594,17 +1609,17 @@ object HogSFlow {
                    case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,connectionsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,connectionsB,sampleRateB)) =>
                         (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, connectionsA+connectionsB,(sampleRateA+sampleRateB)/2)
                 })
-    .filter({ case  (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) => 
-                    connections>150 &
+    .filter({ case  ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) => 
+                    connections>50 &
                     bytesDown*sampleRate > abusedSMTPBytesThreshold
            })
     .sortBy({ 
-              case   (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) =>    bytesDown  
+              case   ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) =>    bytesDown  
             }, false, 15
            )
   .take(100)
-  .foreach{ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) => 
-                    println("("+myIP+","+bytesUp+")" ) 
+  .foreach{ case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) => 
+                    println("("+myIP+","+alienIP+","+bytesUp+")" ) 
                     val flowMap: Map[String,String] = new HashMap[String,String]
                     flowMap.put("flow:id",System.currentTimeMillis.toString)
                     val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(myIP),

@@ -81,6 +81,19 @@ object Histograms {
     ret
   }
   
+  def isTypicalEvent(histogram1:Map[String,Double],event:String):Boolean= 
+  {
+    
+    val p:Double = { if(histogram1.get(event).isEmpty) 0 else histogram1.get(event).get }
+    if(p>atypicalThreshold)
+    {
+    	true
+    }
+    else
+    	false
+         
+  }
+  
   
    def merge(histogram1:HogHistogram,histogram2:HogHistogram):HogHistogram = 
   {
