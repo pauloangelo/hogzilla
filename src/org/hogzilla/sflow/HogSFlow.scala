@@ -385,15 +385,15 @@ object HogSFlow {
                           if(direction1>0)
                           {
                            c+"\n"+
-                           srcIP1+":"+srcPort1+" => "+dstIP1+":"+dstPort1+"  ("+proto1+", Upload: "+humanBytes(bytesUP)+", Download: "+humanBytes(bytesDOWN)+","+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s, sampling rate: 1/"+sampleRate+")"
+                           srcIP1+":"+srcPort1+" => "+dstIP1+":"+dstPort1+"  ("+proto1+", Up: "+humanBytes(bytesUP)+", Down: "+humanBytes(bytesDOWN)+","+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s, sampling: 1/"+sampleRate+")"
                           }else if(direction1<0)
                           {  
                            c+"\n"+
-                           srcIP1+":"+srcPort1+" <= "+dstIP1+":"+dstPort1+"  ("+proto1+", Download: "+humanBytes(bytesUP)+", Upload: "+humanBytes(bytesDOWN)+","+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s, sampling rate: 1/"+sampleRate+")"
+                           srcIP1+":"+srcPort1+" <= "+dstIP1+":"+dstPort1+"  ("+proto1+", Down: "+humanBytes(bytesUP)+", Up: "+humanBytes(bytesDOWN)+","+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s, sampling: 1/"+sampleRate+")"
                           }else
                           {  
                            c+"\n"+
-                           srcIP1+":"+srcPort1+" <?> "+dstIP1+":"+dstPort1+"  ("+proto1+", Left-to-right: "+humanBytes(bytesUP)+", Right-to-left: "+humanBytes(bytesDOWN)+","+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s, sampling rate: 1/"+sampleRate+")"
+                           srcIP1+":"+srcPort1+" <?> "+dstIP1+":"+dstPort1+"  ("+proto1+", L-to-R: "+humanBytes(bytesUP)+", R-to-L: "+humanBytes(bytesDOWN)+","+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s, sampling: 1/"+sampleRate+")"
                           }
                     })
   }
@@ -434,7 +434,7 @@ object HogSFlow {
     if (bytes < unit) return bytes + " B";
     val exp = (log(bytes) / log(unit)).toInt;
     val pre = "KMGTPE".charAt(exp-1)
-    "%.1f %sB".format(bytes / math.pow(unit, exp), pre);
+    "%.1f%sB".format(bytes / math.pow(unit, exp), pre);
   }
   
   
@@ -934,7 +934,8 @@ object HogSFlow {
          event.data.put("bytesUp", bytesUp.toString)
          event.data.put("bytesDown", bytesDown.toString)
          event.data.put("numberPkts", numberPkts.toString)
-         event.data.put("stringFlows", setFlows2String(flowSet))
+         event.data.put("connections", flowSet.size.toString)
+         event.data.put("stringFlows", setFlows2String(flowSet)) 
                            
          populateMediaClient(event).alert()
          
