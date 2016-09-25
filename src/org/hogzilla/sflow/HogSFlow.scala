@@ -77,6 +77,7 @@ object HogSFlow {
   val p2pPairs2ndMethodThreshold = 10
   val p2pDistinctPorts2ndMethodThreshold = 10
   val mediaClientCommunicationDurationThreshold = 300 // 5min (300s)
+  val mediaClientCommunicationDurationMAXThreshold = 7200 // 2h
   val mediaClientPairsThreshold = p2pPairs2ndMethodThreshold
   val mediaClientUploadThreshold = 10000000L // ~10MB
   //val mediaClientDownloadThreshold = 10000000L // ~10MB
@@ -869,7 +870,6 @@ object HogSFlow {
     sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) 
                   =>  proto.equals("TCP")     &
-                      myPort.toInt < 10000    &
                       myPort.toInt > 1000     &
                       alienPort.toInt < 10000 &
                       alienPort.toInt > 1000  &
@@ -892,7 +892,8 @@ object HogSFlow {
            case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,beginTime,endTime,sampleRate)) =>
                 !isMyIP(alienIP,myNets)  &
                 !p2pTalkers.contains(myIP) &
-                (endTime-beginTime) > mediaClientCommunicationDurationThreshold 
+                (endTime-beginTime) > mediaClientCommunicationDurationThreshold &
+                (endTime-beginTime) < mediaClientCommunicationDurationMAXThreshold 
           })
   .map({
           case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,beginTime,endTime,sampleRate)) =>
