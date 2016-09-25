@@ -78,9 +78,9 @@ object HogSFlow {
   val p2pDistinctPorts2ndMethodThreshold = 10
   val mediaClientCommunicationDurationThreshold = 300 // 5min (300s)
   val mediaClientPairsThreshold = p2pPairs2ndMethodThreshold
-  val mediaClientUploadThreshold = 1000000L // ~1MB
+  val mediaClientUploadThreshold = 10000000L // ~10MB
   //val mediaClientDownloadThreshold = 10000000L // ~10MB
-  val mediaClientDownloadThreshold = 0L // 0MB
+  val mediaClientDownloadThreshold = 1000000L // 1MB
   val dnsTunnelThreshold = 50000000L // ~50 MB
  
   /**
@@ -385,15 +385,15 @@ object HogSFlow {
                           if(direction1>0)
                           {
                            c+"\n"+
-                           srcIP1+":"+srcPort1+" => "+dstIP1+":"+dstPort1+"  ("+proto1+", Up: "+humanBytes(bytesUP)+", Down: "+humanBytes(bytesDOWN)+","+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s, sampling: 1/"+sampleRate+")"
+                           srcIP1+":"+srcPort1+" => "+dstIP1+":"+dstPort1+"  ("+proto1+", Up: "+humanBytes(bytesUP*sampleRate)+", Down: "+humanBytes(bytesDOWN*sampleRate)+","+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s, sampling: 1/"+sampleRate+")"
                           }else if(direction1<0)
                           {  
                            c+"\n"+
-                           srcIP1+":"+srcPort1+" <= "+dstIP1+":"+dstPort1+"  ("+proto1+", Down: "+humanBytes(bytesUP)+", Up: "+humanBytes(bytesDOWN)+","+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s, sampling: 1/"+sampleRate+")"
+                           srcIP1+":"+srcPort1+" <= "+dstIP1+":"+dstPort1+"  ("+proto1+", Down: "+humanBytes(bytesUP*sampleRate)+", Up: "+humanBytes(bytesDOWN*sampleRate)+","+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s, sampling: 1/"+sampleRate+")"
                           }else
                           {  
                            c+"\n"+
-                           srcIP1+":"+srcPort1+" <?> "+dstIP1+":"+dstPort1+"  ("+proto1+", L-to-R: "+humanBytes(bytesUP)+", R-to-L: "+humanBytes(bytesDOWN)+","+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s, sampling: 1/"+sampleRate+")"
+                           srcIP1+":"+srcPort1+" <?> "+dstIP1+":"+dstPort1+"  ("+proto1+", L-to-R: "+humanBytes(bytesUP*sampleRate)+", R-to-L: "+humanBytes(bytesDOWN*sampleRate)+","+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s, sampling: 1/"+sampleRate+")"
                           }
                     })
   }
@@ -601,10 +601,6 @@ object HogSFlow {
     case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,sampleRate)) =>
     bytesUp*sampleRate > topTalkersThreshold
          })
-  .sortBy({ 
-          case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,sampleRate)) =>    bytesUp  }, false, 15
-          )
-  .take(5000+whiteTopTalkers.size)
   .filter(tp => {  !whiteTopTalkers.map { net => if( tp._1.startsWith(net) )
                                             { true } else {false} 
                                         }.contains(true) 
@@ -617,17 +613,15 @@ object HogSFlow {
                     val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(myIP),
                                                                  InetAddress.getByName("255.255.255.255").getAddress))
                     event.data.put("hostname", myIP)
-                    event.data.put("bytesUp", bytesUp.toString)
-                    event.data.put("bytesDown", bytesDown.toString)
+                    event.data.put("bytesUp", (bytesUp*sampleRate).toString)
+                    event.data.put("bytesDown", (bytesDown*sampleRate).toString)
                     event.data.put("numberPkts", numberPkts.toString)
-                    event.data.put("threshold", topTalkersThreshold.toString)
+                    event.data.put("threshold", humanBytes(topTalkersThreshold))
                     event.data.put("stringFlows", setFlows2String(flowSet))
                     
                     populateTopTalker(event).alert()
            }
-  
-
-  
+    
     
  /*
   * 
@@ -667,12 +661,12 @@ object HogSFlow {
          )
   .filter({ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) => 
                    {  
-                     /*!whiteSMTPTalkers.map { net => if( myIP.startsWith(net) )
+                     !whiteSMTPTalkers.map { net => if( myIP.startsWith(net) )
                                                       { true } else{false} 
-                                           }.contains(true)*/ 
-                     val savedLastHogHistogram=HogHBaseHistogram.getHistogram("HIST01-"+myIP)
-                     
-                     !Histograms.isTypicalEvent(savedLastHogHistogram.histMap, "25")  & // Exclude SMTP servers
+                                           }.contains(true) &
+                     { val savedLastHogHistogram=HogHBaseHistogram.getHistogram("HIST01-"+myIP)
+                       !Histograms.isTypicalEvent(savedLastHogHistogram.histMap, "25")// Exclude SMTP servers
+                     } &
                      connections > 1 // Consider just MyIPs that generated more than 2 SMTP connections
                    }
           })
@@ -685,8 +679,8 @@ object HogSFlow {
                                                                  InetAddress.getByName("255.255.255.255").getAddress))
                     
                     event.data.put("hostname", myIP)
-                    event.data.put("bytesUp", bytesUp.toString)
-                    event.data.put("bytesDown", bytesDown.toString)
+                    event.data.put("bytesUp", (bytesUp*sampleRate).toString)
+                    event.data.put("bytesDown", (bytesDown*sampleRate).toString)
                     event.data.put("numberPkts", numberPkts.toString)
                     event.data.put("connections", connections.toString)
                     event.data.put("stringFlows", setFlows2String(flowSet))
@@ -726,9 +720,7 @@ object HogSFlow {
               })
   .map({
          case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,sampleRate)) =>
-
               println("FTP Communication "+myIP+ " <?> "+alienIP)
-
               (myIP,alienIP)
       }).toArray().toSet
   
@@ -793,8 +785,8 @@ object HogSFlow {
                                                       InetAddress.getByName("255.255.255.255").getAddress))
          event.data.put("numberOfPairs",numberOfPairs.toString)
          event.data.put("myIP", myIP)
-         event.data.put("bytesUp", bytesUp.toString)
-         event.data.put("bytesDown", bytesDown.toString)
+         event.data.put("bytesUp", (bytesUp*sampleRate).toString)
+         event.data.put("bytesDown", (bytesDown*sampleRate).toString)
          event.data.put("numberPkts", numberPkts.toString)
          event.data.put("stringFlows", setFlows2String(flowSet))
                            
@@ -850,8 +842,6 @@ object HogSFlow {
     .map({
       case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs,sampleRate)) =>
       
-         //p2pTalkers.add(myIP)
-         
          println("MyIP: "+myIP+ " - P2P Communication 2nd method, number of pairs: "+numberOfPairs)
                             
          val flowMap: Map[String,String] = new HashMap[String,String]
@@ -860,8 +850,8 @@ object HogSFlow {
                                                       InetAddress.getByName("255.255.255.255").getAddress))
          event.data.put("numberOfPairs",numberOfPairs.toString)
          event.data.put("myIP", myIP)
-         event.data.put("bytesUp", bytesUp.toString)
-         event.data.put("bytesDown", bytesDown.toString)
+         event.data.put("bytesUp", (bytesUp*sampleRate).toString)
+         event.data.put("bytesDown", (bytesDown*sampleRate).toString)
          event.data.put("numberPkts", numberPkts.toString)
          event.data.put("stringFlows", setFlows2String(flowSet))
                            
@@ -874,9 +864,6 @@ object HogSFlow {
 
 
   println("Media streaming clients")
-  
-
-
   val mediaClientCollection:PairRDDFunctions[(String,String), (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long)],
                                             Long,Long,Long,Long)] = 
     sflowSummary
@@ -917,8 +904,8 @@ object HogSFlow {
               })
   .filter({ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,pairs,sampleRate)) =>
                  pairs     < mediaClientPairsThreshold  &
-                 bytesUp   < mediaClientUploadThreshold &
-                 bytesDown >= mediaClientDownloadThreshold
+                 bytesUp*sampleRate   < mediaClientUploadThreshold &
+                 bytesDown*sampleRate >= mediaClientDownloadThreshold
           })
     .map({ 
       case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairs,sampleRate)) =>
@@ -931,8 +918,8 @@ object HogSFlow {
                                                       InetAddress.getByName("255.255.255.255").getAddress))
          event.data.put("numberOfPairs",numberOfPairs.toString)
          event.data.put("myIP", myIP)
-         event.data.put("bytesUp", bytesUp.toString)
-         event.data.put("bytesDown", bytesDown.toString)
+         event.data.put("bytesUp",   (bytesUp*sampleRate).toString)
+         event.data.put("bytesDown", (bytesDown*sampleRate).toString)
          event.data.put("numberPkts", numberPkts.toString)
          event.data.put("connections", flowSet.size.toString)
          event.data.put("stringFlows", setFlows2String(flowSet)) 
@@ -962,7 +949,7 @@ object HogSFlow {
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) 
                   =>  direction  < 0 &
                       !ftpTalkers.contains((myIP,alienIP)) &
-                      ( numberPkts > 1  ) // TODO: Implement PSH flags... 
+                      ( numberPkts > 2  ) // TODO: Implement PSH flags... 
            })
     .map({
       case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate)) =>
@@ -1019,8 +1006,8 @@ object HogSFlow {
                                                                          InetAddress.getByName("255.255.255.255").getAddress))
                             event.data.put("myIP", myIP)
                             event.data.put("tcpport", atypical.mkString(","))
-                            event.data.put("bytesUp", bytesUp.toString)
-                            event.data.put("bytesDown", bytesDown.toString)
+                            event.data.put("bytesUp", (bytesUp*sampleRate).toString)
+                            event.data.put("bytesDown", (bytesDown*sampleRate).toString)
                             event.data.put("numberPkts", numberPkts.toString)
                             event.data.put("stringFlows", setFlows2String(flowSet.filter({p => atypical.contains(p._2)})))
                     
