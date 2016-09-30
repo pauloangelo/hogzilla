@@ -569,6 +569,9 @@ object HogSFlow {
   val RDDtotalSize= sflowSummary.count()
   println("Filtered sflowSummary has "+RDDtotalSize+" rows!")
   
+  if(RDDtotalSize==0)
+    return
+  
  /*
   * 
   * Top Talkers
