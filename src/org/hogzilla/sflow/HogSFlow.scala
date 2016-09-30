@@ -1562,7 +1562,7 @@ object HogSFlow {
                                                                  InetAddress.getByName("255.255.255.255").getAddress))
                     
                     event.data.put("hostname", myIP)
-                    event.data.put("bytesUP", (bytesUp*sampleRate).toString)
+                    event.data.put("bytesUp", (bytesUp*sampleRate).toString)
                     event.data.put("bytesDown", (bytesDown*sampleRate).toString)
                     event.data.put("numberPkts", numberPkts.toString)
                     event.data.put("connections", connections.toString)
@@ -1619,7 +1619,7 @@ object HogSFlow {
                                                                  formatIPtoBytes(alienIP)))
                     
                     event.data.put("hostname", myIP)
-                    event.data.put("bytesUP",   (bytesUp*sampleRate).toString)
+                    event.data.put("bytesUp",   (bytesUp*sampleRate).toString)
                     event.data.put("bytesDown", (bytesDown*sampleRate).toString)
                     event.data.put("numberPkts", numberPkts.toString)
                     event.data.put("connections", connections.toString)
@@ -1672,7 +1672,7 @@ object HogSFlow {
                                                                  InetAddress.getByName("255.255.255.255").getAddress))
                     
                     event.data.put("hostname", myIP)
-                    event.data.put("bytesUP",   (bytesUp*sampleRate).toString)
+                    event.data.put("bytesUp",   (bytesUp*sampleRate).toString)
                     event.data.put("bytesDown", (bytesDown*sampleRate).toString)
                     event.data.put("numberPkts", numberPkts.toString)
                     event.data.put("connections", connections.toString)
