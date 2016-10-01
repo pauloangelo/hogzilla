@@ -43,6 +43,7 @@ import java.util.ArrayList
 import org.apache.hadoop.hbase.client.Scan
 import org.apache.hadoop.hbase.filter.Filter
 import scala.collection.mutable.HashSet
+import org.apache.hadoop.hbase.client.Put
 
 
 object HogHBaseReputation {
@@ -80,5 +81,15 @@ object HogHBaseReputation {
     list.toSet
 
 	}
+  
+ def saveReputationList(listName:String, listType:String, ip:String) =
+ {
+     val put = new Put(Bytes.toBytes(ip+"-"+listName+"-"+listType))
+     put.add(Bytes.toBytes("rep"), Bytes.toBytes("list_type"), Bytes.toBytes(listType))
+     put.add(Bytes.toBytes("rep"), Bytes.toBytes("list"), Bytes.toBytes(listName))
+     put.add(Bytes.toBytes("rep"), Bytes.toBytes("ip"), Bytes.toBytes(ip))
+     
+     HogHBaseRDD.hogzilla_reputation.put(put)
+ }
 
 }

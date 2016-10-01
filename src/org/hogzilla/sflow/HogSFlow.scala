@@ -84,6 +84,7 @@ object HogSFlow {
   //val mediaClientDownloadThreshold = 10000000L // ~10MB
   val mediaClientDownloadThreshold = 1000000L // 1MB
   val dnsTunnelThreshold = 50000000L // ~50 MB
+  val bigProviderThreshold = 1073741824L // (1*1024*1024*1024 = 1G)
  
   /**
    * 
@@ -1303,6 +1304,8 @@ object HogSFlow {
   println("")
   println("Atypical amount of data transfered")
   
+  val bigProviderNets = HogHBaseReputation.getReputationList("BigProvider", "whitelist")
+  
   val atypicalAmountDataCollection: PairRDDFunctions[(String,String), (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long,Int)]
                                                       ,Long,Long)] = 
     sflowSummary
@@ -1311,7 +1314,8 @@ object HogSFlow {
                       direction > -1       &
                       myPort.toLong > 1024 &
                       !myPort.equals("8080") &
-                      !isMyIP(alienIP,myNets)
+                      !isMyIP(alienIP,myNets) & // Exclude internal communication
+                      !isMyIP(alienIP,bigProviderNets) // Exclude bigProviders
            })
     .map({
           case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
@@ -1371,29 +1375,6 @@ object HogSFlow {
 
                           if(atypical.size>0 & savedHistogram.histMap.filter({case (key,value) => value > 0.001D}).size <5)
                           {
-                            // Recompute avoiding big Internet providers
-                            
-                             flowSet
-                             .filter({ case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) =>
-                              
-                              val savedHogHistogramBytes=HogHBaseHistogram.getHistogram("HIST05-"+ipSignificantNetwork(alienIP))
-                              
-                              if(savedHogHistogramBytes
-                                  .histMap
-                                  .filter({case (key,value) => key.toDouble>= floor(log(bytesUp.*(0.0001)+1D)) & value>Histograms.atypicalThreshold}).size>0)
-                              {
-                                truexxx
-                              }
-                              else
-                                true
-                              })
-                            
-                            
-                            
-                            
-                            
-                            
-                            
                             println("MyIP: "+myIP+ "  (N:1,S:"+savedHistogram.histSize+") - Atypical amount of sent bytes: "+bytesUp)
                             
                             val flowMap: Map[String,String] = new HashMap[String,String]
@@ -1474,21 +1455,40 @@ object HogSFlow {
                     if({
                           flowSet
                           .map({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) => myIP})
-                          .toList.distinct.size>3
+                          .toList.distinct.size>4
                     }) // Consider just if there are more than 3 distinct MyHosts as pairs 
                     {
+                    
+                    val histogramBytes = new HashMap[String,Double]
+                    flowSet
+                       .map({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) => 
+                                     (floor(log(bytesUp.*(0.0001)+1D)).toString,1D)
+                            })
+                       .toMap
+                       .groupBy(_._1)
+                       .map({
+                        case (group,traversable) =>
+                              traversable.reduce({(a,b) => (a._1,a._2+b._2)})
+                           })
+                       .map({case (key,value) => histogramBytes.put(key,value)})
                       
-                      flowSet
-                          .map({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) => (myIP,bytesUp)})
-                          .toMap.XXX // Mean,Max, etc..
-                          
-                          
                       val savedHogHistogramBytes=HogHBaseHistogram.getHistogram("HIST06-"+alienNetwork)
-                      val histogramBytes = new HashMap[String,Double]
-                      val key = floor(log(MAX.*(0.0001)+1D)).toString
-                      histogramBytes.put(key, 1D)
-                      HogHBaseHistogram.saveHistogram(Histograms.merge(savedHogHistogramBytes, new HogHistogram("",1L,histogramBytes)))
+                      HogHBaseHistogram.saveHistogram(Histograms.merge(savedHogHistogramBytes, new HogHistogram("",numberOfFlows,histogramBytes)))
+                      
+                      val maxBytesUp=
+                        flowSet
+                       .map({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) => 
+                                     bytesUp*sampleRate
+                            }).max
+                       if(maxBytesUp>bigProviderThreshold)
+                       {
+                          HogHBaseReputation.saveReputationList("BigProvider", "whitelist", alienNetwork)
+                       }
+                           
                     }
+                    // Bytes End
+                    
+                    
                     
                     if(savedHogHistogram.histSize < 1000)
                     {
