@@ -1461,8 +1461,11 @@ object HogSFlow {
                     
                     val histogramBytes = new HashMap[String,Double]
                     flowSet
+                       .filter({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) =>
+                                myPort.toInt > 1023
+                            })
                        .map({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) => 
-                                     (floor(log(bytesUp.*(0.0001)+1D)).toString,1D)
+                                     (floor(log((bytesUp*sampleRate).*(0.0001)+1D)).toString,1D)
                             })
                        .toMap
                        .groupBy(_._1)
