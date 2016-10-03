@@ -58,13 +58,14 @@ object HogSFlow {
                    HogSignature(3,"HZ: Atypical TCP/UDP port used",            2,1,826001003,826).saveHBase(),//3
                    HogSignature(3,"HZ: Atypical alien TCP/UDP port used",      2,1,826001004,826).saveHBase(),//4
                    HogSignature(3,"HZ: Atypical number of pairs in the period",2,1,826001005,826).saveHBase(),//5
-                   HogSignature(3,"HZ: Atypical amount of data transferred",    2,1,826001006,826).saveHBase(),//6
+                   HogSignature(3,"HZ: Atypical amount of data transferred",   2,1,826001006,826).saveHBase(),//6
                    HogSignature(3,"HZ: Alien accessing too much hosts",        3,1,826001007,826).saveHBase(),//7
                    HogSignature(3,"HZ: P2P communication",                     3,1,826001008,826).saveHBase(),//8
                    HogSignature(3,"HZ: UDP amplifier (DDoS)",                  1,1,826001009,826).saveHBase(),//9
                    HogSignature(3,"HZ: Abused SMTP Server",                    1,1,826001010,826).saveHBase(),//10
                    HogSignature(3,"HZ: Media streaming client",                3,1,826001011,826).saveHBase(),//11
-                   HogSignature(3,"HZ: DNS Tunnel",                            1,1,826001012,826).saveHBase())//12
+                   HogSignature(3,"HZ: DNS Tunnel",                            1,1,826001012,826).saveHBase(),//12
+                   HogSignature(3,"HZ: ICMP Tunnel",                           1,1,826001013,826).saveHBase())//13
   
   val alienThreshold = 20
   val topTalkersThreshold:Long = 21474836480L // (20*1024*1024*1024 = 20G)
@@ -85,6 +86,8 @@ object HogSFlow {
   val mediaClientDownloadThreshold = 1000000L // 1MB
   val dnsTunnelThreshold = 50000000L // ~50 MB
   val bigProviderThreshold = 1073741824L // (1*1024*1024*1024 = 1G)
+  val icmpTunnelThreshold = 1000000L // ~1MB
+  val icmpTotalTunnelThreshold = 50000000L // ~50MB
  
   /**
    * 
@@ -93,7 +96,6 @@ object HogSFlow {
    */
   def run(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)],spark:SparkContext)
   {
-    
    // TopTalkers, SMTP Talkers, XXX: Organize it!
    top(HogRDD)
  
@@ -377,6 +379,29 @@ object HogSFlow {
     event
   }
   
+     
+  def populateICMPTunnel(event:HogEvent):HogEvent =
+  {
+    val hostname:String = event.data.get("hostname")
+    val bytesUp:String = event.data.get("bytesUp")
+    val bytesDown:String = event.data.get("bytesDown")
+    val numberPkts:String = event.data.get("numberPkts")
+    val stringFlows:String = event.data.get("stringFlows")
+    val connections:String = event.data.get("connections")
+    
+    event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
+                  "Abnormal behaviour: Host has DNS communication with large amount of data. \n"+
+                  "IP: "+hostname+"\n"+
+                  "Bytes Up: "+humanBytes(bytesUp)+"\n"+
+                  "Bytes Down: "+humanBytes(bytesDown)+"\n"+
+                  "Packets: "+numberPkts+"\n"+
+                  "Connections: "+connections+"\n"+
+                  "Flows"+stringFlows
+                  
+    event.signature_id = signature._13.signature_id       
+    event
+  }
+  
  
   
   def setFlows2String(flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long,Int)]):String =
@@ -400,6 +425,34 @@ object HogSFlow {
                            srcIP1+":"+srcPort1+" <?> "+dstIP1+":"+dstPort1+" "+statusInd+" ("+proto1+", L-to-R: "+humanBytes(bytesUP*sampleRate)+", R-to-L: "+humanBytes(bytesDOWN*sampleRate)+","+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s, sampling: 1/"+sampleRate+")"
                           }
                     })
+  }
+  
+  
+  def setFlowsICMP2String(flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long,Int)]):String =
+  {
+     flowSet
+      .toList
+      .sortBy({case (srcIP1,srcPort1,dstIP1,dstPort1,proto1,bytesUP,bytesDOWN,numberPkts1,direction1,beginTime,endTime,sampleRate,status) =>  
+                        bytesUP+bytesDOWN 
+             })
+      .reverse 
+      ./:("")({ case (c,(srcIP1,icmpType,dstIP1,icmpCode,proto1,bytesUP,bytesDOWN,numberPkts1,direction1,beginTime,endTime,sampleRate,status)) 
+                     => 
+                     if(direction1>0)
+                     {
+                       c+"\n"+
+                       srcIP1+" -> "+dstIP1+" ("+proto1+", Type/Code: "+icmpType+"/"+icmpCode+", L-to-R: "+humanBytes(bytesUP*sampleRate)+", R-to-L: "+humanBytes(bytesDOWN*sampleRate)+","+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s, sampling: 1/"+sampleRate+")"
+                     }else if(direction1<0)
+                     { 
+                       c+"\n"+
+                       srcIP1+" <- "+dstIP1+" ("+proto1+", Type/Code: "+icmpType+"/"+icmpCode+", L-to-R: "+humanBytes(bytesUP*sampleRate)+", R-to-L: "+humanBytes(bytesDOWN*sampleRate)+","+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s, sampling: 1/"+sampleRate+")"
+                     }else
+                     {
+                       c+"\n"+
+                       srcIP1+" <?> "+dstIP1+" ("+proto1+", Type/Code: "+icmpType+"/"+icmpCode+", L-to-R: "+humanBytes(bytesUP*sampleRate)+", R-to-L: "+humanBytes(bytesDOWN*sampleRate)+","+numberPkts1+" pkts, duration: "+(endTime-beginTime)+"s, sampling: 1/"+sampleRate+")"
+                     }
+                     
+             })
   }
   
   def formatIPtoBytes(ip:String):Array[Byte] =
@@ -554,7 +607,7 @@ object HogSFlow {
                                   })
                            .map({case ((myIP,myPort,alienIP,alienPort, proto ),(bytesUP,bytesDown,numberOfPkts,direction,beginTime,endTime,iPprotocol,sampleRate,status))
                                     =>((myIP,myPort,alienIP,alienPort, proto ),(bytesUP,bytesDown,numberOfPkts,direction,beginTime,endTime,sampleRate,status))
-                                }).cache
+                                })
 
 
     // (srcIP, srcPort, dstIP, dstPort, totalBytes, numberOfPkts)
@@ -562,6 +615,63 @@ object HogSFlow {
       sflowSummary1
       .reduceByKey({ case ((bytesUpA,bytesDownA,pktsA,directionA,beginTimeA,endTimeA,sampleRateA,statusA),(bytesUpB,bytesDownB,pktsB,directionB,beginTimeB,endTimeB,sampleRateB,statusB)) => 
                            (bytesUpA+bytesUpB,bytesDownA+bytesDownB,pktsA+pktsB,directionA+directionB,beginTimeA.min(beginTimeB),endTimeA.max(endTimeB),(sampleRateA+sampleRateB)/2,statusA+statusB)
+                  })
+      .cache
+      
+      
+  val sflowSummaryICMP1: PairRDDFunctions[(String,String,String,String,String), (Long,Long,Long,Int,Long,Long,Long)] 
+                      = HogRDD
+                        .map ({  case (id,result) => 
+                                     
+                                      val srcIP       = Bytes.toString(result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("srcIP")))
+                                      val icmpType    = Bytes.toString(result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("srcPort")))
+                                      val dstIP       = Bytes.toString(result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("dstIP")))
+                                      val icmpCode    = Bytes.toString(result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("dstPort")))
+                                      val packetSize  = Bytes.toString(result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("packetSize"))).toLong
+                                      val IPprotocol  = Bytes.toString(result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("IPprotocol")))
+                                      val timestamp   = Bytes.toString(result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("timestamp"))).toLong
+                                      val sampleRate   = Bytes.toString(result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("samplingRate"))).toLong
+
+                                      var protoName="ICMPv6" 
+                                      
+                                      if(IPprotocol.equals("1")) // If is ICMP
+                                      {
+                                        protoName="ICMP"
+                                      }
+                                      
+                               if(!isMyIP(srcIP,myNets))
+                               {
+                                 ((  dstIP,
+                                       icmpType,
+                                       srcIP,
+                                       icmpCode, 
+                                       protoName ), 
+                                    (0L, packetSize, 1L,-1,timestamp,timestamp,IPprotocol,sampleRate)
+                                   )
+                               }else
+                               {
+                                  ((  srcIP,
+                                       icmpType,
+                                       dstIP,
+                                       icmpCode, 
+                                       protoName ), 
+                                    (packetSize, 0L, 1L, 1,timestamp,timestamp,IPprotocol,sampleRate)
+                                   )
+                                   
+                               } 
+                           })
+                           .filter({case ((myIP,icmpType,alienIP,icmpCode, proto ),(bytesUP,bytesDown,numberOfPkts,direction,beginTime,endTime,iPprotocolNumber,sampleRate))
+                                             =>  iPprotocolNumber.equals("1") || iPprotocolNumber.equals("58") // ICMP or ICMPv6
+                                  })
+                           .map({case ((myIP,icmpType,alienIP,icmpCode, proto ),(bytesUP,bytesDown,numberOfPkts,direction,beginTime,endTime,iPprotocol,sampleRate))
+                                    =>((myIP,icmpType,alienIP,icmpCode, proto ),(bytesUP,bytesDown,numberOfPkts,direction,beginTime,endTime,sampleRate))
+                                })
+
+
+  val sflowSummaryICMP = 
+      sflowSummaryICMP1
+      .reduceByKey({ case ((bytesUpA,bytesDownA,pktsA,directionA,beginTimeA,endTimeA,sampleRateA),(bytesUpB,bytesDownB,pktsB,directionB,beginTimeB,endTimeB,sampleRateB)) => 
+                           (bytesUpA+bytesUpB,bytesDownA+bytesDownB,pktsA+pktsB,directionA+directionB,beginTimeA.min(beginTimeB),endTimeA.max(endTimeB),(sampleRateA+sampleRateB)/2)
                   })
       .cache
          
@@ -1753,8 +1863,66 @@ object HogSFlow {
                     
                     populateDNSTunnel(event).alert()
            }
+  
+  
+  
+  
+  
+   /*
+   * 
+   *  ICMP tunnels
+   * 
+   */
    
+  println("")
+  println("ICMP tunnels")
+  val icmpTunnelCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long,Int)],Long,Long)] =
+  sflowSummaryICMP
+  .filter({case ((srcIP,icmpType,dstIP,icmpCode, proto ),(bytesUp,bytesDown,numberOfPkts,direction,beginTime,endTime,sampleRate)) 
+                  =>  
+                      (bytesUp+bytesDown)*sampleRate > icmpTunnelThreshold
+           })
+    .map({
+          case ((srcIP,icmpType,dstIP,icmpCode, proto ),(bytesUp,bytesDown,numberOfPkts,direction,beginTime,endTime,sampleRate)) =>
+               val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long,Int)] = new HashSet()
+               flowSet.add((srcIP,icmpType,dstIP,icmpCode,proto,bytesUp,bytesDown,numberOfPkts,direction,beginTime,endTime,sampleRate,0))
+               (srcIP,(bytesUp,bytesDown,numberOfPkts,flowSet,1L,sampleRate))
+        })
+  
+  
+  icmpTunnelCollection
+    .reduceByKey({
+                   case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,connectionsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,connectionsB,sampleRateB)) =>
+                        (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, connectionsA+connectionsB,(sampleRateA+sampleRateB)/2)
+                })
+    .filter({
+      case   (srcIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) =>
+         (bytesUp+bytesDown)*sampleRate > icmpTotalTunnelThreshold
+    })
+    .sortBy({ 
+              case   (srcIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) =>    bytesUp+bytesDown  
+            }, false, 15
+           )
+  .take(30)
+  .foreach{ case (srcIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) => 
+                    println("("+srcIP+","+bytesUp+")" ) 
+                    val flowMap: Map[String,String] = new HashMap[String,String]
+                    flowMap.put("flow:id",System.currentTimeMillis.toString)
+                    val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(srcIP),
+                                                                 InetAddress.getByName("255.255.255.255").getAddress))
+                    
+                    event.data.put("hostname", srcIP)
+                    event.data.put("bytesUp",   (bytesUp*sampleRate).toString)
+                    event.data.put("bytesDown", (bytesDown*sampleRate).toString)
+                    event.data.put("numberPkts", numberPkts.toString)
+                    event.data.put("connections", connections.toString)
+                    event.data.put("stringFlows", setFlowsICMP2String(flowSet)) 
+                    
+                    populateICMPTunnel(event).alert()
+           }
+  
+  
+  
+  // END
   }
-  
-  
 }
