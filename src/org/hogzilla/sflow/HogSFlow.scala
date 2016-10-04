@@ -1088,7 +1088,7 @@ object HogSFlow {
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
                   =>  direction  < 0 &
                       !ftpTalkers.contains((myIP,alienIP)) &
-                      //( numberPkts > 1  ) & 
+                      ( numberPkts > 1  ) & 
                       //bytesUp > 0 &
                       //bytesDown > 0 &
                       status > 0 // PSH-ACK or SYN-ACK flags 
