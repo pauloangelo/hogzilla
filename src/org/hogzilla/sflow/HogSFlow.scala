@@ -86,8 +86,8 @@ object HogSFlow {
   val mediaClientDownloadThreshold = 1000000L // 1MB
   val dnsTunnelThreshold = 50000000L // ~50 MB
   val bigProviderThreshold = 1073741824L // (1*1024*1024*1024 = 1G)
-  val icmpTunnelThreshold = 1000000L // ~1MB
-  val icmpTotalTunnelThreshold = 50000000L // ~50MB
+  val icmpTunnelThreshold = 200 // 200b
+  val icmpTotalTunnelThreshold = 100000000L // ~100MB
  
   /**
    * 
@@ -1714,7 +1714,7 @@ object HogSFlow {
                         myPort.equals("1900")
                       ) &
                       proto.equals("UDP")      &
-                      bytesUp*sampleRate>800   &
+                      bytesUp/numberPkts >800   &
                       !isMyIP(alienIP,myNets)                      
            })
     .map({
@@ -1880,7 +1880,7 @@ object HogSFlow {
   sflowSummaryICMP
   .filter({case ((srcIP,icmpType,dstIP,icmpCode, proto ),(bytesUp,bytesDown,numberOfPkts,direction,beginTime,endTime,sampleRate)) 
                   =>  
-                      (bytesUp+bytesDown)*sampleRate > icmpTunnelThreshold
+                      (bytesUp+bytesDown)/numberOfPkts > icmpTunnelThreshold
            })
     .map({
           case ((srcIP,icmpType,dstIP,icmpCode, proto ),(bytesUp,bytesDown,numberOfPkts,direction,beginTime,endTime,sampleRate)) =>
