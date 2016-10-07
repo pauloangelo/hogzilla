@@ -1719,7 +1719,7 @@ object HogSFlow {
                         myPort.equals("1900")
                       ) &
                       proto.equals("UDP")      &
-                      bytesUp/numberPkts >800   &
+                      bytesUp/numberPkts >200   &
                       !isMyIP(alienIP,myNets)                      
            })
     .map({
@@ -1736,7 +1736,7 @@ object HogSFlow {
                         (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, connectionsA+connectionsB,(sampleRateA+sampleRateB)/2)
                 })
     .filter({ case  (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) => 
-                    numberPkts>1000
+                    numberPkts>300
            })
     .sortBy({ 
               case   (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) =>    bytesUp  
