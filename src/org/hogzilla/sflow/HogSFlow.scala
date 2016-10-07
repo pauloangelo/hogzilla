@@ -56,7 +56,7 @@ object HogSFlow {
   val signature = (HogSignature(3,"HZ: Top talker identified" ,                2,1,826001001,826).saveHBase(),//1
                    HogSignature(3,"HZ: SMTP talker identified",                1,1,826001002,826).saveHBase(),//2
                    HogSignature(3,"HZ: Atypical TCP/UDP port used",            2,1,826001003,826).saveHBase(),//3
-                   HogSignature(3,"HZ: Atypical alien TCP/UDP port used",      2,1,826001004,826).saveHBase(),//4
+                   HogSignature(3,"HZ: Atypical alien TCP port used",          2,1,826001004,826).saveHBase(),//4
                    HogSignature(3,"HZ: Atypical number of pairs in the period",2,1,826001005,826).saveHBase(),//5
                    HogSignature(3,"HZ: Atypical amount of data transferred",   2,1,826001006,826).saveHBase(),//6
                    HogSignature(3,"HZ: Alien accessing too much hosts",        3,1,826001007,826).saveHBase(),//7
@@ -1122,7 +1122,7 @@ object HogSFlow {
                             (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram.map({ case (port,qtdC) => (port,qtdC/numberOfFlows.toDouble) }),numberOfFlows,sampleRate))
           })
     .filter({case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram,numberOfFlows,sampleRate)) =>
-                   !p2pTalkers.contains(myIP) // Avoid P2P talkers
+                   !p2pTalkers.contains(myIP)  // Avoid P2P talkers
            })
     .foreach{case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram,numberOfFlows,sampleRate)) => 
                     
@@ -1136,6 +1136,11 @@ object HogSFlow {
                     {
                           //val KBDistance = Histograms.KullbackLiebler(hogHistogram.histMap, map)
                           val atypical   = Histograms.atypical(hogHistogram.histMap, histogram)
+                                                     .filter { port => !port.equals("80") & !port.equals("443") & // Exclude highly common FP
+                                                                       ( !Histograms.isTypicalEvent(hogHistogram.histMap,"21") |
+                                                                         port.toInt < 1024
+                                                                        ) // Avoid FTP servers
+                                                              } 
 
                           if(atypical.size>0)
                           {
