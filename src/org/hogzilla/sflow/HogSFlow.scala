@@ -569,6 +569,11 @@ object HogSFlow {
                                         {
                                           status = OCCURRED
                                         }
+                                        
+                                        if(tcpFlags.equals("0x10") & isMyIP(srcIP,myNets)) // Is a ACK pkt originated by a MyHost 
+                                        {
+                                          status = OCCURRED
+                                        }
                                           
                                         // Suppose that ports < 1024 would not used for clients
                                         if(direction==UNKNOWN)
@@ -1086,12 +1091,12 @@ object HogSFlow {
                                              Map[String,Double],Long,Long)] = 
     sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
-                  =>  direction  < 0 &
+                  =>  //direction  < 0 & // Algorithm implemented below to dig this information in another interesting form
                       !ftpTalkers.contains((myIP,alienIP)) &
                       ( numberPkts > 1  ) & 
                       //bytesUp > 0 &
                       //bytesDown > 0 &
-                      status > 0 // PSH-ACK or SYN-ACK flags 
+                      status > 0 // PSH-ACK or SYN-ACK flags or ACK from MyHost 
            })
     .map({
       case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
@@ -1124,18 +1129,58 @@ object HogSFlow {
     .filter({case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram,numberOfFlows,sampleRate)) =>
                    !p2pTalkers.contains(myIP)  // Avoid P2P talkers
            })
-    .foreach{case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram,numberOfFlows,sampleRate)) => 
+    .foreach{case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram1,numberOfFlows,sampleRate)) => 
+      
+                 // Remove ports used to connect as client, and not to serve
+                    val newHistogram = 
+                    histogram1.filter({
+                        case (port,weight) =>
+                          
+                          val qtdAlienPorts =
+                          flowSet
+                            .filter({
+                                    case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) =>
+                                         myPort.equals(port)
+                                   })
+                            .map({
+                                  case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) =>
+                                       (alienPort,1L)
+                                })
+                            .groupBy(_._1)
+                            .map({
+                                  case (group,traversable) =>
+                                       traversable.reduce({(a,b) => (a._1,a._2+b._2)})
+                               })
+                            .map({
+                                  case (alienPort,qtd) =>
+                                       alienPort
+                               })
+                            .count({ x => true })
+                            
+                           val numberOfFlowsUsingThisMyPort =
+                             flowSet.filter({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) =>
+                               myPort.equals(port)               
+                             }).count(p=>true)
+                          
+                           if( ( qtdAlienPorts >3 ) &
+                               ( (qtdAlienPorts.toDouble/numberOfFlowsUsingThisMyPort.toDouble) > 0.2  )  
+                             )
+                             true
+                           else
+                             false
+                    })  
+                    
                     
                     val hogHistogram=HogHBaseHistogram.getHistogram("HIST01-"+myIP)
                     
                     if(hogHistogram.histSize < 100)
                     {
                       //println("IP: "+dstIP+ "  (N:"+qtd+",S:"+hogHistogram.histSize+") - Learn More!")
-                      HogHBaseHistogram.saveHistogram(Histograms.merge(hogHistogram, new HogHistogram("",numberOfFlows,histogram)))
+                      HogHBaseHistogram.saveHistogram(Histograms.merge(hogHistogram, new HogHistogram("",numberOfFlows,newHistogram)))
                     }else
                     {
                           //val KBDistance = Histograms.KullbackLiebler(hogHistogram.histMap, map)
-                          val atypical   = Histograms.atypical(hogHistogram.histMap, histogram)
+                          val atypical   = Histograms.atypical(hogHistogram.histMap, newHistogram)
                                                      .filter { port => !port.equals("80") & !port.equals("443") & // Exclude highly common FP
                                                                        ( !Histograms.isTypicalEvent(hogHistogram.histMap,"21") |
                                                                          port.toInt < 1024
@@ -1160,7 +1205,7 @@ object HogSFlow {
                     
                             populateAtypicalTCPPortUsed(event).alert()
                           }
-                      HogHBaseHistogram.saveHistogram(Histograms.merge(hogHistogram, new HogHistogram("",numberOfFlows,histogram)))
+                      HogHBaseHistogram.saveHistogram(Histograms.merge(hogHistogram, new HogHistogram("",numberOfFlows,newHistogram)))
                     }
              }
   
@@ -1719,7 +1764,7 @@ object HogSFlow {
                         myPort.equals("1900")
                       ) &
                       proto.equals("UDP")      &
-                      bytesUp/numberPkts >200   &
+                      bytesUp/numberPkts >250   &
                       !isMyIP(alienIP,myNets)                      
            })
     .map({
@@ -1736,7 +1781,7 @@ object HogSFlow {
                         (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, connectionsA+connectionsB,(sampleRateA+sampleRateB)/2)
                 })
     .filter({ case  (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) => 
-                    numberPkts>300
+                    numberPkts>400
            })
     .sortBy({ 
               case   (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) =>    bytesUp  
