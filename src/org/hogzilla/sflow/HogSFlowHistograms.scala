@@ -206,7 +206,7 @@ object HogSFlowHistograms {
         println("Elements per cluster:\n"+elementsPerCluster.mkString(",\n"))
         
         // Delete saved clusters
-        (1 to k by 1).toList.foreach { HogHBaseCluster.deleteCluster(_) }
+        (0 to k by 1).toList.foreach { HogHBaseCluster.deleteCluster(_) }
         
    
             
@@ -229,7 +229,7 @@ object HogSFlowHistograms {
                     {
                       println("################################################################\n"+
                               "CLUSTER: "+clusterIdx+"\n"+
-                              "Centroid:\n"+centroidMain.mkString(",\n")+"\n"+
+                              "Centroid:\n"+centroidMain.filter(_._2>10).mkString(",")+"\n"+
                               "clusterSize: "+clusterSize+"\n")
                               
                       HogHBaseCluster.saveCluster(clusterIdx,centroidMain,clusterSize,members.filter(_._1.equals(clusterIdx)).map({_._2}))
