@@ -225,7 +225,7 @@ object HogSFlowHistograms {
                     val centroidMain = allKeys.zip(centroid.toArray)//.filter(_._2>10)
                     val clusterSize  = elementsPerCluster.get(clusterIdx).get
                     
-                    if(centroidMain.filter(_._2>10).size>0)
+                    if(centroidMain.filter(_._2>10).size>0 & clusterSize > 4)
                     {
                       println("################################################################\n"+
                               "CLUSTER: "+clusterIdx+"\n"+

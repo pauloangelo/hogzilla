@@ -29,9 +29,10 @@ import org.apache.hadoop.hbase.client.Delete
 
 object HogHBaseCluster {
 
- def formatTitle(clusterCentroid: List[(Long,Double)]):String =
+ def formatTitle(clusterCentroid: List[(Long,Double)], clusterIdx:Int):String =
  {
    val mainTitle = 
+   "Cluster "+clusterIdx.toString+" - "+
    clusterCentroid
    .filter({case (port,rate) =>
             rate > 9.999
@@ -61,7 +62,7 @@ object HogHBaseCluster {
  
  def deleteCluster(clusterIdx:Int)=
  {
-     val del = new Delete(Bytes.toBytes(clusterIdx))
+     val del = new Delete(Bytes.toBytes(clusterIdx.toString))
      HogHBaseRDD.hogzilla_clusters.delete(del)
  }
  
@@ -70,7 +71,7 @@ object HogHBaseCluster {
      val memberString = members.mkString(",")
    
      val put = new Put(Bytes.toBytes(clusterIdx.toString))
-     put.add(Bytes.toBytes("info"), Bytes.toBytes("title"), Bytes.toBytes(formatTitle(clusterCentroid)))
+     put.add(Bytes.toBytes("info"), Bytes.toBytes("title"), Bytes.toBytes(formatTitle(clusterCentroid,clusterIdx)))
      put.add(Bytes.toBytes("info"), Bytes.toBytes("size"), Bytes.toBytes(clusterSize.toString))
      put.add(Bytes.toBytes("info"), Bytes.toBytes("centroid"), Bytes.toBytes(clusterCentroid.mkString("[",",","]")))
      put.add(Bytes.toBytes("info"), Bytes.toBytes("members"), Bytes.toBytes(memberString))
