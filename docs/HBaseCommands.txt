@@ -7,6 +7,7 @@ create 'hogzilla_signatures','signature'
 create 'hogzilla_mynets','net'
 create 'hogzilla_reputation','rep'
 create 'hogzilla_histograms','info','values'
+create 'hogzilla_clusters','info'
 
 put 'hogzilla_mynets', '10.', 'net:description', 'Intranet 1'
 put 'hogzilla_mynets', '10.', 'net:prefix', '10.'

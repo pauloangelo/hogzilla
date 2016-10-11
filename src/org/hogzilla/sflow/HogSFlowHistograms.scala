@@ -48,6 +48,7 @@ import org.apache.commons.math3.analysis.function.Min
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.linalg.Vector
 import org.apache.spark.mllib.clustering.KMeans
+import org.hogzilla.hbase.HogHBaseCluster
 
 
 /**
@@ -95,15 +96,6 @@ object HogSFlowHistograms {
     event
   }
   
-  
-  def formatIPtoBytes(ip:String):Array[Byte] =
-  {
-    // Eca! Snorby doesn't support IPv6 yet. See https://github.com/Snorby/snorby/issues/65
-    if(ip.contains(":"))
-      InetAddress.getByName("255.255.6.6").getAddress
-    else  
-      InetAddress.getByName(ip).getAddress
-  }
  
   def isMyIP(ip:String,myNets:Set[String]):Boolean =
   {
@@ -112,6 +104,8 @@ object HogSFlowHistograms {
                           else{false} 
                 }).contains(true)
   }
+  
+  
   
   
   /**
@@ -211,9 +205,39 @@ object HogSFlowHistograms {
         println("(Mean,StdDev,Max)("+k+"): "+mean+","+stdDev+","+max+".")
         println("Elements per cluster:\n"+elementsPerCluster.mkString(",\n"))
         
+        // Delete saved clusters
+        (1 to k by 1).toList.foreach { HogHBaseCluster.deleteCluster(_) }
+        
+   
+            
+       val members =
+       kmeansResult
+       .map({case (cluster,(distance,histogramName,histogramSize,keys,vector)) =>
+              (cluster,histogramName.subSequence(histogramName.lastIndexOf("-")+1, histogramName.length()).toString)
+        }).cache().toArray()
+   
+   
         val grouped = kmeansResult.groupByKey()
+        grouped
+        .foreach({ case ((clusterIdx,iterator)) =>
+                    
+                    val centroid     = model.clusterCenters(clusterIdx)
+                    val centroidMain = allKeys.zip(centroid.toArray)//.filter(_._2>10)
+                    val clusterSize  = elementsPerCluster.get(clusterIdx).get
+                    
+                    if(centroidMain.filter(_._2>10).size>0)
+                    {
+                      println("################################################################\n"+
+                              "CLUSTER: "+clusterIdx+"\n"+
+                              "Centroid:\n"+centroidMain.mkString(",\n")+"\n"+
+                              "clusterSize: "+clusterSize+"\n")
+                              
+                      HogHBaseCluster.saveCluster(clusterIdx,centroidMain,clusterSize,members.filter(_._1.equals(clusterIdx)).map({_._2}))
+                    }
+                 })
         
         
+        /*
         grouped
         .foreach({ case ((clusterIdx,iterator)) =>
                     
@@ -266,10 +290,11 @@ object HogSFlowHistograms {
                       
                       } 
                  })
-                      
+       */          
     
    
    
   }
+
 
 }

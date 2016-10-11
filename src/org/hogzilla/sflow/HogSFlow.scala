@@ -1155,12 +1155,12 @@ object HogSFlow {
                                   case (alienPort,qtd) =>
                                        alienPort
                                })
-                            .count({ x => true })
+                            .size
                             
                            val numberOfFlowsUsingThisMyPort =
                              flowSet.filter({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) =>
                                myPort.equals(port)               
-                             }).count(p=>true)
+                             }).size
                           
                            if( ( qtdAlienPorts >3 ) &
                                ( (qtdAlienPorts.toDouble/numberOfFlowsUsingThisMyPort.toDouble) > 0.2  )  
