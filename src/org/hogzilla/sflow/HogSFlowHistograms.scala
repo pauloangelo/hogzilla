@@ -69,31 +69,9 @@ object HogSFlowHistograms {
   def run(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)],spark:SparkContext)
   {
     
-   // TopTalkers, SMTP Talkers, XXX: Organize it!
+   //  XXX: Organize it!
    realRun(HogRDD)
  
-  }
-  
-  
-  def populateTopTalker(event:HogEvent):HogEvent =
-  {
-    val hostname:String = event.data.get("hostname")
-    val bytesUp:String = event.data.get("bytesUp")
-    val bytesDown:String = event.data.get("bytesDown")
-    val threshold:String = event.data.get("threshold")
-    val numberPkts:String = event.data.get("numberPkts")
-    val stringFlows:String = event.data.get("stringFlows")
-    
-    event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
-                  "Abnormal behaviour: Large amount of sent data (>"+threshold+")\n"+
-                  "IP: "+hostname+"\n"+
-                  "Bytes Up: "+bytesUp+"\n"+
-                  "Bytes Down: "+bytesDown+"\n"+
-                  "Packets: "+numberPkts+"\n"+
-                  "Flows"+stringFlows
-                    
-    event.signature_id = signature.signature_id       
-    event
   }
   
  
@@ -104,8 +82,6 @@ object HogSFlowHistograms {
                           else{false} 
                 }).contains(true)
   }
-  
-  
   
   
   /**
@@ -133,7 +109,7 @@ object HogSFlowHistograms {
                                     
                                       val histogramSize    = Bytes.toString(result.getValue(Bytes.toBytes("info"), Bytes.toBytes("size"))).toLong
                                       val histogramName    = Bytes.toString(result.getValue(Bytes.toBytes("info"), Bytes.toBytes("name")))
-                                      val histMap              = HogHBaseHistogram.mapByResult(result)
+                                      val histMap          = HogHBaseHistogram.mapByResult(result)
                                       
                                       val keys:Set[Long] = histMap.filter({ case (key,value) => key.toDouble < 10000 & value>0.001})
                                                            .keySet

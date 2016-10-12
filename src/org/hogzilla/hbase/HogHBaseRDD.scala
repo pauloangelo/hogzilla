@@ -126,7 +126,7 @@ object HogHBaseRDD {
 
    
    if (!admin.isTableAvailable(table)) {
-     println("Table hogzilla_sflows does not exist.")
+     println("Table hogzilla_histograms does not exist.")
     }
     
      val hBaseRDD = spark.newAPIHadoopRDD(conf, classOf[TableInputFormat],
