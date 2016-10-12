@@ -819,8 +819,7 @@ object HogSFlow {
                     println("("+myIP+","+bytesUp+")" ) 
                     val flowMap: Map[String,String] = new HashMap[String,String]
                     flowMap.put("flow:id",System.currentTimeMillis.toString)
-                    val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(myIP),
-                                                                 InetAddress.getByName("255.255.255.255").getAddress))
+                    val event = new HogEvent(new HogFlow(flowMap,myIP,"255.255.255.255"))
                     
                     event.data.put("hostname", myIP)
                     event.data.put("bytesUp", (bytesUp*sampleRate).toString)
@@ -925,8 +924,7 @@ object HogSFlow {
                             
          val flowMap: Map[String,String] = new HashMap[String,String]
          flowMap.put("flow:id",System.currentTimeMillis.toString)
-         val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(myIP),
-                                                      InetAddress.getByName("255.255.255.255").getAddress))
+         val event = new HogEvent(new HogFlow(flowMap,myIP,"255.255.255.255"))
          event.data.put("numberOfPairs",numberOfPairs.toString)
          event.data.put("myIP", myIP)
          event.data.put("bytesUp", (bytesUp*sampleRate).toString)
@@ -990,8 +988,7 @@ object HogSFlow {
                             
          val flowMap: Map[String,String] = new HashMap[String,String]
          flowMap.put("flow:id",System.currentTimeMillis.toString)
-         val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(myIP),
-                                                      InetAddress.getByName("255.255.255.255").getAddress))
+         val event = new HogEvent(new HogFlow(flowMap,myIP,"255.255.255.255"))
          event.data.put("numberOfPairs",numberOfPairs.toString)
          event.data.put("myIP", myIP)
          event.data.put("bytesUp", (bytesUp*sampleRate).toString)
@@ -1058,8 +1055,7 @@ object HogSFlow {
                             
          val flowMap: Map[String,String] = new HashMap[String,String]
          flowMap.put("flow:id",System.currentTimeMillis.toString)
-         val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(myIP),
-                                                      InetAddress.getByName("255.255.255.255").getAddress))
+         val event = new HogEvent(new HogFlow(flowMap,myIP,"255.255.255.255"))
          event.data.put("numberOfPairs",numberOfPairs.toString)
          event.data.put("myIP", myIP)
          event.data.put("bytesUp",   (bytesUp*sampleRate).toString)
@@ -1194,8 +1190,7 @@ object HogSFlow {
                             
                             val flowMap: Map[String,String] = new HashMap[String,String]
                             flowMap.put("flow:id",System.currentTimeMillis.toString)
-                            val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(myIP),
-                                                                         InetAddress.getByName("255.255.255.255").getAddress))
+                            val event = new HogEvent(new HogFlow(flowMap,myIP,"255.255.255.255"))
                             event.data.put("myIP", myIP)
                             event.data.put("tcpport", atypical.mkString(","))
                             event.data.put("bytesUp", (bytesUp*sampleRate).toString)
@@ -1336,8 +1331,7 @@ object HogSFlow {
                             
                             val flowMap: Map[String,String] = new HashMap[String,String]
                             flowMap.put("flow:id",System.currentTimeMillis.toString)
-                            val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(myIP),
-                                                                         InetAddress.getByName("255.255.255.255").getAddress))
+                            val event = new HogEvent(new HogFlow(flowMap,myIP,"255.255.255.255"))
                             event.data.put("myIP", myIP)
                             event.data.put("tcpport", newAtypical.mkString(","))
                             event.data.put("bytesUp", (bytesUp*sampleRate).toString)
@@ -1435,8 +1429,7 @@ object HogSFlow {
                             
                             val flowMap: Map[String,String] = new HashMap[String,String]
                             flowMap.put("flow:id",System.currentTimeMillis.toString)
-                            val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(myIP),
-                                                                         InetAddress.getByName("255.255.255.255").getAddress))
+                            val event = new HogEvent(new HogFlow(flowMap,myIP,"255.255.255.255"))
                             event.data.put("numberOfPairs",numberOfPairs.toString)
                             event.data.put("myIP", myIP)
                             event.data.put("bytesUp",   (bytesUp*sampleRate).toString)
@@ -1539,8 +1532,7 @@ object HogSFlow {
                             
                             val flowMap: Map[String,String] = new HashMap[String,String]
                             flowMap.put("flow:id",System.currentTimeMillis.toString)
-                            val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(myIP),
-                                                                         InetAddress.getByName("255.255.255.255").getAddress))
+                            val event = new HogEvent(new HogFlow(flowMap,myIP,"255.255.255.255"))
                             event.data.put("numberOfPairs",numberOfPairs.toString)
                             event.data.put("myIP", myIP)
                             event.data.put("bytesUp",   (bytesUp*sampleRate).toString)
@@ -1732,8 +1724,7 @@ object HogSFlow {
                          
                             val flowMap: Map[String,String] = new HashMap[String,String]
                             flowMap.put("flow:id",System.currentTimeMillis.toString)
-                            val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(alienIP),
-                                                                         InetAddress.getByName("255.255.255.255").getAddress))
+                            val event = new HogEvent(new HogFlow(flowMap,alienIP,"255.255.255.255"))
                             
                             event.data.put("numberOfPairs",numberOfPairs.toString)
                             event.data.put("alienIP", alienIP)
@@ -1791,8 +1782,7 @@ object HogSFlow {
                     println("("+myIP+","+bytesUp+")" ) 
                     val flowMap: Map[String,String] = new HashMap[String,String]
                     flowMap.put("flow:id",System.currentTimeMillis.toString)
-                    val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(myIP),
-                                                                 InetAddress.getByName("255.255.255.255").getAddress))
+                    val event = new HogEvent(new HogFlow(flowMap,myIP,"255.255.255.255"))
                     
                     event.data.put("hostname", myIP)
                     event.data.put("bytesUp", (bytesUp*sampleRate).toString)
@@ -1848,8 +1838,7 @@ object HogSFlow {
                     println("("+myIP+","+alienIP+","+bytesUp+")" ) 
                     val flowMap: Map[String,String] = new HashMap[String,String]
                     flowMap.put("flow:id",System.currentTimeMillis.toString)
-                    val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(myIP),
-                                                                 formatIPtoBytes(alienIP)))
+                    val event = new HogEvent(new HogFlow(flowMap,myIP,alienIP))
                     
                     event.data.put("hostname", myIP)
                     event.data.put("bytesUp",   (bytesUp*sampleRate).toString)
@@ -1901,8 +1890,7 @@ object HogSFlow {
                     println("("+myIP+","+bytesUp+")" ) 
                     val flowMap: Map[String,String] = new HashMap[String,String]
                     flowMap.put("flow:id",System.currentTimeMillis.toString)
-                    val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(myIP),
-                                                                 InetAddress.getByName("255.255.255.255").getAddress))
+                    val event = new HogEvent(new HogFlow(flowMap,myIP,"255.255.255.255"))
                     
                     event.data.put("hostname", myIP)
                     event.data.put("bytesUp",   (bytesUp*sampleRate).toString)
@@ -1958,8 +1946,7 @@ object HogSFlow {
                     println("("+srcIP+","+bytesUp+")" ) 
                     val flowMap: Map[String,String] = new HashMap[String,String]
                     flowMap.put("flow:id",System.currentTimeMillis.toString)
-                    val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(srcIP),
-                                                                 InetAddress.getByName("255.255.255.255").getAddress))
+                    val event = new HogEvent(new HogFlow(flowMap,srcIP,"255.255.255.255"))
                     
                     event.data.put("hostname", srcIP)
                     event.data.put("bytesUp",   (bytesUp*sampleRate).toString)

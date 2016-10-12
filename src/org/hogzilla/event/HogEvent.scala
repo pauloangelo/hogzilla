@@ -25,6 +25,7 @@ import org.apache.hadoop.hbase.client.Put
 import org.apache.hadoop.hbase.util.Bytes
 import org.hogzilla.hbase.HogHBaseRDD
 import org.hogzilla.util.HogFlow
+import java.net.InetAddress
 
 
 class HogEvent(flow:HogFlow) 
@@ -34,13 +35,26 @@ class HogEvent(flow:HogFlow)
 	var priorityid:Int=0
 	var text:String=""
 	var data:Map[String,String]=new HashMap()
+ 
+  
+  def formatIPtoBytes(ip:String):Array[Byte] =
+  {
+    // Eca! Snorby doesn't support IPv6 yet. See https://github.com/Snorby/snorby/issues/65
+    if(ip.contains(":"))
+      InetAddress.getByName("255.255.6.6").getAddress
+    else  
+      InetAddress.getByName(ip).getAddress
+  }
 
+  
    def alert()
    {
 	   val put = new Put(Bytes.toBytes(flow.get("flow:id")))
      put.add(Bytes.toBytes("event"), Bytes.toBytes("note"), Bytes.toBytes(text))
-     put.add(Bytes.toBytes("event"), Bytes.toBytes("lower_ip"), flow.lower_ip)
-     put.add(Bytes.toBytes("event"), Bytes.toBytes("upper_ip"), flow.upper_ip)
+     put.add(Bytes.toBytes("event"), Bytes.toBytes("lower_ip"), formatIPtoBytes(flow.lower_ip))
+     put.add(Bytes.toBytes("event"), Bytes.toBytes("upper_ip"), formatIPtoBytes(flow.upper_ip))
+     put.add(Bytes.toBytes("event"), Bytes.toBytes("lower_ip_str"), Bytes.toBytes(flow.lower_ip))
+     put.add(Bytes.toBytes("event"), Bytes.toBytes("upper_ip_str"), Bytes.toBytes(flow.upper_ip))
      put.add(Bytes.toBytes("event"), Bytes.toBytes("signature_id"), Bytes.toBytes("%.0f".format(signature_id)))
      put.add(Bytes.toBytes("event"), Bytes.toBytes("time"), Bytes.toBytes(System.currentTimeMillis))
      HogHBaseRDD.hogzilla_events.put(put)

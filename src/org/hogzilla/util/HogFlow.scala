@@ -26,7 +26,7 @@ import scala.collection.mutable.Map
 /**
  * @author pa
  */
-case class HogFlow(map:Map[String,String],lower_ip:Array[Byte],upper_ip:Array[Byte]) {
+case class HogFlow(map:Map[String,String],lower_ip:String,upper_ip:String) {
   
   def get(key:String):String =
   {

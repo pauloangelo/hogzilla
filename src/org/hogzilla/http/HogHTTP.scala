@@ -145,7 +145,7 @@ object HogHTTP {
           
           val lower_ip = result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("lower_ip"))
           val upper_ip = result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("upper_ip"))
-          new HogFlow(map,lower_ip,upper_ip)
+          new HogFlow(map,Bytes.toString(lower_ip),Bytes.toString(upper_ip))
         }
     }.filter(x => ( x.get("flow:lower_port").equals("80") || 
                     x.get("flow:upper_port").equals("80") || 
