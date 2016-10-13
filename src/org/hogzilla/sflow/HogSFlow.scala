@@ -1089,7 +1089,7 @@ object HogSFlow {
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
                   =>  //direction  < 0 & // Algorithm implemented below to dig this information in another interesting form
                       !ftpTalkers.contains((myIP,alienIP)) &
-                      ( numberPkts > 1  ) & 
+                      //( numberPkts > 1  ) & XXX: Test 
                       //bytesUp > 0 &
                       //bytesDown > 0 &
                       status > 0 // PSH-ACK or SYN-ACK flags or ACK from MyHost 
@@ -1221,7 +1221,7 @@ object HogSFlow {
                                                   Map[String,Double],Long,Long)] = 
     sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
-                  =>  numberPkts > 1           &
+                  =>  //numberPkts > 1           & //XXX: Test
                       alienPort.toLong < 10000 &
                       direction > -1           &
                       myPort.toLong > 1024     &
