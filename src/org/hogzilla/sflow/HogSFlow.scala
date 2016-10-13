@@ -1560,15 +1560,19 @@ object HogSFlow {
   */
 
   println("")
-  println("Atypical TCP/UDP port used by Alien Network")
+  println("Atypical TCP port used by Alien Network")
           
  val atypicalAlienReverseTCPCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long,Int)],
                                                         Map[String,Double],Long,Long)] = 
     sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
                   =>  numberPkts  >1   &
+                      myPort.toLong >1024 &
+                      alienPort.toLong <10000 &
+                      proto.equals("TCP") &
                       !isMyIP(alienIP,myNets) &  // Flow InternalIP <-> ExternalIP
-                      !p2pTalkers.contains(myIP) // Avoid P2P communication
+                      !p2pTalkers.contains(myIP) & // Avoid P2P communication
+                      !ftpTalkers.contains((myIP,alienIP)) 
            })
     .map({
       case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
@@ -1608,7 +1612,7 @@ object HogSFlow {
                           flowSet
                           .map({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) => myIP})
                           .toList.distinct.size>4
-                    }) // Consider just if there are more than 3 distinct MyHosts as pairs 
+                    }) // Consider just if there are more than 4 distinct MyHosts as pairs 
                     {
                     
                     val histogramBytes = new HashMap[String,Double]
