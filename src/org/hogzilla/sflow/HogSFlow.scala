@@ -1566,7 +1566,7 @@ object HogSFlow {
                                                         Map[String,Double],Long,Long)] = 
     sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
-                  =>  numberPkts  >1   &
+                  => // numberPkts  >1   & // XXX: Test
                       myPort.toLong >1024 &
                       alienPort.toLong <10000 &
                       proto.equals("TCP") &
