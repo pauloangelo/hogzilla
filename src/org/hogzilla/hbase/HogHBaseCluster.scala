@@ -25,17 +25,18 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.mllib.linalg.Vector
 import org.apache.hadoop.hbase.client.Get
 import org.apache.hadoop.hbase.client.Delete
+import org.hogzilla.cluster.HogClusterMember
 
 
 object HogHBaseCluster {
 
- def formatTitle(clusterCentroid: List[(Long,Double)], clusterIdx:Int):String =
+ def formatClusterTitle(clusterCentroid: List[(Long,Double)], clusterIdx:Int):String =
  {
    val mainTitle = 
    "Cluster "+clusterIdx.toString+" - "+
    clusterCentroid
    .filter({case (port,rate) =>
-            rate > 9.999
+            rate > 4.999
           })
    .map({case (port,rate) =>
             port.toString()+":"+"%.0f".format(rate)+"%"
@@ -44,7 +45,7 @@ object HogHBaseCluster {
    val onePercentList=
    clusterCentroid
    .filter({case (port,rate) =>
-            .9999 < rate & rate < 10
+            .9999 < rate & rate < 5
           })
           
    if(onePercentList.size>0)
@@ -66,17 +67,48 @@ object HogHBaseCluster {
      HogHBaseRDD.hogzilla_clusters.delete(del)
  }
  
- def saveCluster(clusterIdx:Int, clusterCentroid: List[(Long,Double)], clusterSize: Long, members:Array[String]) = {
+ 
+ def deleteClusterMember(memberIP:String)=
+ {
+     val del = new Delete(Bytes.toBytes(memberIP))
+     HogHBaseRDD.hogzilla_cluster_members.delete(del)
+ }
+ 
+ def saveCluster(clusterIdx:Int, clusterCentroid:List[(Long,Double)], clusterSize: Long, members:Array[String]) = {
    
      val memberString = members.mkString(",")
    
      val put = new Put(Bytes.toBytes(clusterIdx.toString))
-     put.add(Bytes.toBytes("info"), Bytes.toBytes("title"), Bytes.toBytes(formatTitle(clusterCentroid,clusterIdx)))
+     put.add(Bytes.toBytes("info"), Bytes.toBytes("title"), Bytes.toBytes(formatClusterTitle(clusterCentroid,clusterIdx)))
      put.add(Bytes.toBytes("info"), Bytes.toBytes("size"), Bytes.toBytes(clusterSize.toString))
      put.add(Bytes.toBytes("info"), Bytes.toBytes("centroid"), Bytes.toBytes(clusterCentroid.mkString("[",",","]")))
      put.add(Bytes.toBytes("info"), Bytes.toBytes("members"), Bytes.toBytes(memberString))
      
      HogHBaseRDD.hogzilla_clusters.put(put)
+  }
+ 
+ def saveClusterMember(clusterMember:HogClusterMember) = {
+   
+     val put = new Put(Bytes.toBytes(clusterMember.clusterIdx.toString))
+     put.add(Bytes.toBytes("info"),   Bytes.toBytes("title"),      Bytes.toBytes(clusterMember.formatTitle))
+     put.add(Bytes.toBytes("cluster"),Bytes.toBytes("size"),       Bytes.toBytes(clusterMember.clusterSize.toString))
+     put.add(Bytes.toBytes("cluster"),Bytes.toBytes("centroid"),   Bytes.toBytes(clusterMember.centroid.mkString("[",",","]")))
+     put.add(Bytes.toBytes("cluster"),Bytes.toBytes("idx"),        Bytes.toBytes(clusterMember.clusterIdx.toString))
+     put.add(Bytes.toBytes("cluster"),Bytes.toBytes("description"),Bytes.toBytes(formatClusterTitle(clusterMember.centroid,clusterMember.clusterIdx)))
+     put.add(Bytes.toBytes("member"), Bytes.toBytes("ports"),      Bytes.toBytes(clusterMember.ports.mkString("",",","")))
+     put.add(Bytes.toBytes("member"), Bytes.toBytes("frequencies"),Bytes.toBytes(
+                                                                           clusterMember.frequency_vector
+                                                                           .filter({case (port,freq) => clusterMember.ports.contains(port)})
+                                                                           .map({case (port,freq) => port.toString+"="+
+                                                                                                     "%.0f".format(freq)+"%"
+                                                                                })
+                                                                           .mkString("",", ","")
+                                                                          ))
+     put.add(Bytes.toBytes("member"), Bytes.toBytes("ip"),         Bytes.toBytes(clusterMember.memberIP))
+     put.add(Bytes.toBytes("member"), Bytes.toBytes("distance"),   Bytes.toBytes("%.2f".format(clusterMember.distance.toString)))
+     
+     
+     HogHBaseRDD.hogzilla_cluster_members.put(put)
   }
   
 

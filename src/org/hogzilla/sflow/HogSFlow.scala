@@ -156,7 +156,7 @@ object HogSFlow {
     val stringFlows:String = event.data.get("stringFlows")
     
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
-                  "Abnormal behaviour: Atypical TCP/UDP port used ("+tcpport+")\n"+
+                  "Abnormal behaviour: Atypical TCP port used ("+tcpport+")\n"+
                   "IP: "+myIP+"\n"+
                   "Bytes Up: "+humanBytes(bytesUp)+"\n"+
                   "Bytes Down: "+humanBytes(bytesDown)+"\n"+
@@ -179,7 +179,7 @@ object HogSFlow {
     
     
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
-                  "Abnormal behaviour: Atypical alien TCP/UDP port used ("+tcpport+")\n"+
+                  "Abnormal behaviour: Atypical alien TCP port used ("+tcpport+")\n"+
                   "IP: "+myIP+"\n"+
                   "Bytes Up: "+humanBytes(bytesUp)+"\n"+
                   "Bytes Down: "+humanBytes(bytesDown)+"\n"+
@@ -1215,7 +1215,7 @@ object HogSFlow {
   
 
   println("")
-  println("Atypical alien TCP/UDP port used")
+  println("Atypical alien TCP port used")
   
  val atypicalAlienTCPCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long,Int)],
                                                   Map[String,Double],Long,Long)] = 
@@ -1228,7 +1228,8 @@ object HogSFlow {
                       !myPort.equals("8080")   &
                       !isMyIP(alienIP,myNets)  &
                       !ftpTalkers.contains((myIP,alienIP)) &// Avoid FTP communication
-                      proto.equals("TCP")
+                      proto.equals("TCP") &
+                      status > 0
            })         
     .map({
       case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
@@ -1263,14 +1264,41 @@ object HogSFlow {
                    !p2pTalkers.contains(myIP) & // Avoid P2P talkers
                    !mediaStreamingClients.contains(myIP)  // Avoid media streaming clients
            })
-    .foreach{case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram,numberOfFlows,sampleRate)) => 
+    .foreach{case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram1,numberOfFlows,sampleRate)) => 
+      
+                    // Remove alienPorts used to connect by Aliens as clients
+                    val alienClientPorts=
+                      flowSet.map({
+                        case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) =>
+                          (myPort,Set(alienPort),1L)
+                      })
+                      .groupBy(_._1)
+                      .map({
+                        case (group,traversable) =>
+                         traversable.reduce({(a,b) => (a._1,a._2++b._2,a._3+b._3)})
+                      })
+                      .filter({case (myPort,alienPorts,qtd) => qtd>1})
+                      .map(_._2)
+                      .reduce({(a,b) => a++b})
+      
+                    val newHistogram = 
+                    histogram1
+                    .filter({
+                        case (port,weight) =>
+                          
+                          if(alienClientPorts.contains(port))  
+                                 false
+                              else
+                                 true
+                    })  
+                    
                     
                     val savedHogHistogram=HogHBaseHistogram.getHistogram("HIST02-"+myIP)
                     
                     if(savedHogHistogram.histSize < 1000)
                     {
                       //println("IP: "+dstIP+ "  (N:"+qtd+",S:"+hogHistogram.histSize+") - Learn More!")
-                      HogHBaseHistogram.saveHistogram(Histograms.merge(savedHogHistogram, new HogHistogram("",numberOfFlows,histogram)))
+                      HogHBaseHistogram.saveHistogram(Histograms.merge(savedHogHistogram, new HogHistogram("",numberOfFlows,newHistogram)))
                     }else
                     {
                          val savedLastHogHistogram=HogHBaseHistogram.getHistogram("HIST02.1-"+myIP)
@@ -1279,8 +1307,8 @@ object HogSFlow {
                          {
                            
                            //val KBDistance = Histograms.KullbackLiebler(hogHistogram.histMap, map)
-                           val atypical   = Histograms.atypical(savedHogHistogram.histMap, histogram)
-                           val typical   = Histograms.typical(savedLastHogHistogram.histMap, histogram)
+                           val atypical   = Histograms.atypical(savedHogHistogram.histMap, newHistogram)
+                           val typical   = Histograms.typical(savedLastHogHistogram.histMap, newHistogram)
 
                             val newAtypical = 
                             atypical.filter({ atypicalAlienPort =>
@@ -1347,7 +1375,7 @@ object HogSFlow {
                          }
                       
                           
-                      HogHBaseHistogram.saveHistogram(new HogHistogram("HIST02.1-"+myIP,numberOfFlows,histogram))
+                      HogHBaseHistogram.saveHistogram(new HogHistogram("HIST02.1-"+myIP,numberOfFlows,newHistogram))
                     }
                     
              }

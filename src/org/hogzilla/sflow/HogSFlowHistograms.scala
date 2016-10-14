@@ -49,6 +49,7 @@ import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.linalg.Vector
 import org.apache.spark.mllib.clustering.KMeans
 import org.hogzilla.hbase.HogHBaseCluster
+import org.hogzilla.cluster.HogClusterMember
 
 
 /**
@@ -169,8 +170,10 @@ object HogSFlowHistograms {
             val centroid = model.clusterCenters(cluster)
             
             val distance=math.sqrt(vector.toArray.zip(centroid.toArray).map({case (p1,p2) => p1-p2}).map(p => p*p).sum)
+            
+            val memberIP=histogramName.subSequence(histogramName.lastIndexOf("-")+1, histogramName.length()).toString
                        
-            (cluster,(distance,histogramName,histogramSize,keys,vector))
+            (cluster,(distance,histogramName,histogramSize,keys,vector,memberIP))
         }).cache
         
         val mean    = kmeansResult.map(_._2._1).mean
@@ -188,7 +191,7 @@ object HogSFlowHistograms {
             
        val members =
        kmeansResult
-       .map({case (cluster,(distance,histogramName,histogramSize,keys,vector)) =>
+       .map({case (cluster,(distance,histogramName,histogramSize,keys,vector,memberIP)) =>
               (cluster,histogramName.subSequence(histogramName.lastIndexOf("-")+1, histogramName.length()).toString)
         }).cache().toArray()
    
@@ -212,6 +215,32 @@ object HogSFlowHistograms {
                     }
                  })
         
+                 
+                 
+        /*
+         * Save members
+         *          
+         */
+                 
+        kmeansResult
+        .foreach({
+            case (clusterIdx,(distance,histogramName,histogramSize,ports,vector,memberIP)) =>
+              
+                val clusterSize  = elementsPerCluster.get(clusterIdx).get
+                val centroidMain = allKeys.zip(model.clusterCenters(clusterIdx).toArray)//.filter(_._2>10)
+                
+                HogHBaseCluster.deleteClusterMember(memberIP)
+                
+                if(centroidMain.filter(_._2>10).size>0 & clusterSize > 4)
+                {
+                    val frequency_vector = allKeys.zip(vector.toArray)
+                
+                    val clusterMember = new HogClusterMember(clusterIdx, centroidMain, clusterSize, allKeys,
+                                                             memberIP, ports, frequency_vector, distance)
+                
+                    HogHBaseCluster.saveClusterMember(clusterMember)
+                }
+        })
         
         /*
         grouped
