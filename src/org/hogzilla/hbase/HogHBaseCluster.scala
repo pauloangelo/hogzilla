@@ -89,7 +89,7 @@ object HogHBaseCluster {
  
  def saveClusterMember(clusterMember:HogClusterMember) = {
    
-     val put = new Put(Bytes.toBytes(clusterMember.clusterIdx.toString))
+     val put = new Put(Bytes.toBytes(clusterMember.memberIP.toString))
      put.add(Bytes.toBytes("info"),   Bytes.toBytes("title"),      Bytes.toBytes(clusterMember.formatTitle))
      put.add(Bytes.toBytes("cluster"),Bytes.toBytes("size"),       Bytes.toBytes(clusterMember.clusterSize.toString))
      put.add(Bytes.toBytes("cluster"),Bytes.toBytes("centroid"),   Bytes.toBytes(clusterMember.centroid.mkString("[",",","]")))
