@@ -1267,7 +1267,7 @@ object HogSFlow {
     .foreach{case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,histogram1,numberOfFlows,sampleRate)) => 
       
                     // Remove alienPorts used to connect by Aliens as clients
-                    val alienClientPorts=
+                    val alienClientPortsList=
                       flowSet.map({
                         case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) =>
                           (myPort,Set(alienPort),1L)
@@ -1279,7 +1279,15 @@ object HogSFlow {
                       })
                       .filter({case (myPort,alienPorts,qtd) => qtd>1})
                       .map(_._2)
-                      .reduce({(a,b) => a++b})
+                      
+                    val alienClientPorts = 
+                    {
+                      if(alienClientPortsList.size>0)
+                        alienClientPortsList.reduce({(a,b) => a++b})
+                      else
+                        Set("")
+                    }
+                      
       
                     val newHistogram = 
                     histogram1

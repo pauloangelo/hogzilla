@@ -105,7 +105,7 @@ object HogHBaseCluster {
                                                                            .mkString("",", ","")
                                                                           ))
      put.add(Bytes.toBytes("member"), Bytes.toBytes("ip"),         Bytes.toBytes(clusterMember.memberIP))
-     put.add(Bytes.toBytes("member"), Bytes.toBytes("distance"),   Bytes.toBytes("%.2f".format(clusterMember.distance.toString)))
+     put.add(Bytes.toBytes("member"), Bytes.toBytes("distance"),   Bytes.toBytes("%.2f".format(clusterMember.distance)))
      
      
      HogHBaseRDD.hogzilla_cluster_members.put(put)
