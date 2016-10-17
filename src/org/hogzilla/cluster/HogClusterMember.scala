@@ -31,7 +31,7 @@ case class HogClusterMember(clusterIdx:Int, centroid:List[(Long,Double)], cluste
   
   def formatTitle:String =
  {
-     "Cluster information for "+memberIP
+     "Group information for "+memberIP
  }
  
 }

@@ -33,7 +33,7 @@ object HogHBaseCluster {
  def formatClusterTitle(clusterCentroid: List[(Long,Double)], clusterIdx:Int):String =
  {
    val mainTitle = 
-   "Cluster "+clusterIdx.toString+" - "+
+   "Group "+clusterIdx.toString+" - "+
    clusterCentroid
    .filter({case (port,rate) =>
             rate > 4.999
@@ -95,14 +95,14 @@ object HogHBaseCluster {
      put.add(Bytes.toBytes("cluster"),Bytes.toBytes("centroid"),   Bytes.toBytes(clusterMember.centroid.mkString("[",",","]")))
      put.add(Bytes.toBytes("cluster"),Bytes.toBytes("idx"),        Bytes.toBytes(clusterMember.clusterIdx.toString))
      put.add(Bytes.toBytes("cluster"),Bytes.toBytes("description"),Bytes.toBytes(formatClusterTitle(clusterMember.centroid,clusterMember.clusterIdx)))
-     put.add(Bytes.toBytes("member"), Bytes.toBytes("ports"),      Bytes.toBytes(clusterMember.ports.mkString("",",","")))
+     put.add(Bytes.toBytes("member"), Bytes.toBytes("ports"),      Bytes.toBytes(clusterMember.ports.mkString(""," ","")))
      put.add(Bytes.toBytes("member"), Bytes.toBytes("frequencies"),Bytes.toBytes(
                                                                            clusterMember.frequency_vector
                                                                            .filter({case (port,freq) => clusterMember.ports.contains(port)})
                                                                            .map({case (port,freq) => port.toString+"="+
                                                                                                      "%.0f".format(freq)+"%"
                                                                                 })
-                                                                           .mkString("",", ","")
+                                                                           .mkString(""," ","")
                                                                           ))
      put.add(Bytes.toBytes("member"), Bytes.toBytes("ip"),         Bytes.toBytes(clusterMember.memberIP))
      put.add(Bytes.toBytes("member"), Bytes.toBytes("distance"),   Bytes.toBytes("%.2f".format(clusterMember.distance)))

@@ -55,7 +55,7 @@ object HogSFlow {
      
   val signature = (HogSignature(3,"HZ: Top talker identified" ,                2,1,826001001,826).saveHBase(),//1
                    HogSignature(3,"HZ: SMTP talker identified",                1,1,826001002,826).saveHBase(),//2
-                   HogSignature(3,"HZ: Atypical TCP/UDP port used",            2,1,826001003,826).saveHBase(),//3
+                   HogSignature(3,"HZ: Atypical TCP port used",            2,1,826001003,826).saveHBase(),//3
                    HogSignature(3,"HZ: Atypical alien TCP port used",          2,1,826001004,826).saveHBase(),//4
                    HogSignature(3,"HZ: Atypical number of pairs in the period",2,1,826001005,826).saveHBase(),//5
                    HogSignature(3,"HZ: Atypical amount of data transferred",   2,1,826001006,826).saveHBase(),//6
