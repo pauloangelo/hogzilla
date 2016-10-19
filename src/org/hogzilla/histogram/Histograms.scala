@@ -151,6 +151,12 @@ object Histograms {
     new HogHistogram(histogram1.histName,total,histogram1.histMap)
   }
   
+  
+  def getIPFromHistName(histogramName:String):String =
+  {
+    histogramName.subSequence(histogramName.lastIndexOf("-")+1, histogramName.length()).toString
+  }
+  
   /*
   final val EPS = 1e-10
   

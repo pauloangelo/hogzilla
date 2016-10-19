@@ -71,7 +71,7 @@ object HogSFlowHistograms {
   {
     
    //  XXX: Organize it!
-   realRun(HogRDD)
+   realRun(HogRDD,spark)
  
   }
   
@@ -90,7 +90,7 @@ object HogSFlowHistograms {
    * 
    * 
    */
-  def realRun(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)])
+  def realRun(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)],spark:SparkContext)
   {
     
    val myNetsTemp =  new HashSet[String]

@@ -22,18 +22,18 @@ package org.hogzilla.hbase
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.Map
 import scala.collection.mutable.Set
-import scala.collection.mutable.HashSet
-import org.apache.hadoop.hbase.client.Scan
-import org.apache.hadoop.hbase.util.Bytes
-import org.apache.hadoop.hbase.client.Get
 import org.apache.hadoop.hbase.Cell
-import org.apache.hadoop.hbase.client.Put
-import org.apache.hadoop.hbase.KeyValue
 import org.apache.hadoop.hbase.CellUtil
-import org.hogzilla.histogram.HogHistogram
-import breeze.stats.hist
-import org.apache.hadoop.hbase.client.Result
+import org.apache.hadoop.hbase.HBaseConfiguration
 import org.apache.hadoop.hbase.client.Delete
+import org.apache.hadoop.hbase.client.Get
+import org.apache.hadoop.hbase.client.Put
+import org.apache.hadoop.hbase.client.Result
+import org.apache.hadoop.hbase.mapreduce.TableInputFormat
+import org.apache.hadoop.hbase.util.Bytes
+import org.apache.spark.SparkContext
+import org.hogzilla.histogram.HogHistogram
+import org.hogzilla.histogram.Histograms
 
 
 
@@ -113,6 +113,35 @@ object HogHBaseHistogram {
       HogHBaseRDD.hogzilla_histograms.delete(new Delete(put.getRow))
       HogHBaseRDD.hogzilla_histograms.put(put)
     
+  }
+  
+  
+  // Ex: FTP Servers
+  def getIPListHIST01(spark: SparkContext,filterPort:String):scala.collection.immutable.Set[String] =
+  {
+    val table = "hogzilla_histograms"
+    val conf = HBaseConfiguration.create()
+
+    conf.set(TableInputFormat.INPUT_TABLE, table)
+    conf.set("zookeeper.session.timeout", "600000")
+    conf.setInt("hbase.client.scanner.timeout.period", 600000)
+    
+    
+    val hBaseRDD = spark.newAPIHadoopRDD(conf, classOf[TableInputFormat],
+                                                classOf[org.apache.hadoop.hbase.io.ImmutableBytesWritable],
+                                                classOf[org.apache.hadoop.hbase.client.Result])
+
+    hBaseRDD
+    .map ({  case (id,result) => 
+                 val port    = Bytes.toString(result.getValue(Bytes.toBytes("values"),Bytes.toBytes(filterPort)))
+                 val name    = Bytes.toString(result.getValue(Bytes.toBytes("info"),Bytes.toBytes("name")))
+                 val size    = Bytes.toString(result.getValue(Bytes.toBytes("info"),Bytes.toBytes("size")))
+                (Histograms.getIPFromHistName(name),size,port)
+        })
+    .filter({case (ip,size,port) => port!=null & !port.isEmpty() & port.toDouble > Histograms.atypicalThreshold})
+    .map({case (ip,size,port) => ip})
+    .toArray()
+    .toSet
   }
 
 }
