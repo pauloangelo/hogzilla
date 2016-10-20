@@ -2166,7 +2166,8 @@ object HogSFlow {
     sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
                   => !alienPort.equals("80")  &
-                     !alienPort.equals("443") & // Avoid common ports
+                     !alienPort.equals("443") & 
+                     !alienPort.equals("53") & // Avoid common ports
                      numberPkts < 5 // few pkts per flow
            })
     .map({
@@ -2460,7 +2461,9 @@ object HogSFlow {
     case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,pairsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,pairsB,sampleRateB)) =>
       (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB,pairsA+pairsB,(sampleRateA+sampleRateB)/2)
   })
-  .filter{case  (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,pairs,sampleRate)) => pairs > ddosMinPairsThreshold }
+  .filter{case  (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,pairs,sampleRate)) => 
+                pairs > ddosMinPairsThreshold 
+         }
   .foreach{case  (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,pairs,sampleRate)) => 
     
               
@@ -2498,11 +2501,11 @@ object HogSFlow {
        HogHBaseReputation.getReputationList("OSRepo", "windows")
                          .map({case ip => (ip -> "Windows")}).toMap++
        HogHBaseReputation.getReputationList("OSRepo", "linux")
-                         .map({case ip => (ip -> "Linux OS")}).toMap++
+                         .map({case ip => (ip -> "Linux")}).toMap++
        HogHBaseReputation.getReputationList("OSRepo", "android")
                          .map({case ip => (ip -> "Android")}).toMap++
        HogHBaseReputation.getReputationList("OSRepo", "apple")
-                         .map({case ip => (ip -> "IOS")}).toMap++
+                         .map({case ip => (ip -> "Apple")}).toMap++
        HogHBaseReputation.getReputationList("OSRepo", "freebsd")
                          .map({case ip => (ip -> "FreeBSD")}).toMap
                          

@@ -41,6 +41,7 @@ object HogHBaseInventory {
    
     
      val put = new Put(Bytes.toBytes(myIP+"-"+opSystem))
+     put.add(Bytes.toBytes("info"), Bytes.toBytes("title"), Bytes.toBytes("Inventory information for "+myIP))
      put.add(Bytes.toBytes("info"), Bytes.toBytes("ip"), Bytes.toBytes(myIP))
      put.add(Bytes.toBytes("info"), Bytes.toBytes("OS"), Bytes.toBytes(opSystem))
      
