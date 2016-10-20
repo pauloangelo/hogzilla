@@ -96,7 +96,8 @@ object HogSFlow {
   val hPortScanMinFlowsThreshold = 100
   val vPortScanMinPortsThreshold = 3
   val vPortScanPortIntervalThreshold = 1024 // 1 to 1023
-  val ddosMinConnectionsThreshold = 20 // Over this, can be considered
+  val ddosMinConnectionsThreshold = 50 // Over this, can be considered
+  val ddosMinPairsThreshold = 20
   
   
   
@@ -2425,14 +2426,16 @@ object HogSFlow {
         numberOfflows > ddosMinConnectionsThreshold &
         !p2pTalkers.contains(myIP) &// Avoid P2P talkers
         {
-          if(flowSet.size>6)
-          {
-              val orderedFlowSet=
-              flowSet
-              .map({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) => beginTime})
-              .toIndexedSeq
-              .sortBy { x => x }
+          
+          val orderedFlowSet=
+          flowSet
+          .map({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) => beginTime})
+          .toIndexedSeq
+          .sortBy { x => x }
               
+          //TODO: Review. You should count the number of equals beginTime and discover why its generating error.
+          if(orderedFlowSet.size>6)
+          {  
               val flowSetMean=
               (orderedFlowSet.slice(1, orderedFlowSet.size)
               .zip(orderedFlowSet.slice(0, orderedFlowSet.size-1))
@@ -2440,7 +2443,7 @@ object HogSFlow {
               .toSeq
               .sortBy { x => x }
               .slice(0,orderedFlowSet.size-4)
-              .sum)/(flowSet.size-4)
+              .sum)/(orderedFlowSet.size-4)
               
                if(flowSetMean<60)
                 true
@@ -2457,6 +2460,7 @@ object HogSFlow {
     case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,pairsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,pairsB,sampleRateB)) =>
       (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB,pairsA+pairsB,(sampleRateA+sampleRateB)/2)
   })
+  .filter{case  (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,pairs,sampleRate)) => pairs > ddosMinPairsThreshold }
   .foreach{case  (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,pairs,sampleRate)) => 
     
               
@@ -2475,7 +2479,7 @@ object HogSFlow {
                             event.data.put("flowsMean", ddosStats.mean.round.toString)
                             event.data.put("flowsStdev", ddosStats.stdev.round.toString)
                             
-                            populateDDoSAttack(event).alert()
+                           populateDDoSAttack(event).alert()
                            
                   
           }
