@@ -2479,7 +2479,8 @@ object HogSFlow {
                             event.data.put("flowsMean", ddosStats.mean.round.toString)
                             event.data.put("flowsStdev", ddosStats.stdev.round.toString)
                             
-                           populateDDoSAttack(event).alert()
+                            // TODO: 
+                           //populateDDoSAttack(event).alert()
                            
                   
           }
@@ -2505,7 +2506,7 @@ object HogSFlow {
        HogHBaseReputation.getReputationList("OSRepo", "freebsd")
                          .map({case ip => (ip -> "FreeBSD")}).toMap
                          
-  val osKeySet = osRepos.keySet
+  val osKeySet:scala.collection.immutable.Set[String] = osRepos.keySet
   
   
   val osCollection: PairRDDFunctions[String, Set[String]] = 

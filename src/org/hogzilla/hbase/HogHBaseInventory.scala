@@ -40,11 +40,11 @@ object HogHBaseInventory {
  def saveInventory(myIP:String, opSystem:String) = {
    
     
-     val put = new Put(Bytes.toBytes(myIP+opSystem))
+     val put = new Put(Bytes.toBytes(myIP+"-"+opSystem))
      put.add(Bytes.toBytes("info"), Bytes.toBytes("ip"), Bytes.toBytes(myIP))
      put.add(Bytes.toBytes("info"), Bytes.toBytes("OS"), Bytes.toBytes(opSystem))
      
-     HogHBaseRDD.hogzilla_clusters.put(put)
+     HogHBaseRDD.hogzilla_inventory.put(put)
   }
  
   
