@@ -45,6 +45,7 @@ import org.hogzilla.histogram.Histograms
 import org.hogzilla.histogram.HogHistogram
 import org.hogzilla.util.HogFlow
 import org.apache.commons.math3.analysis.function.Min
+import org.hogzilla.hbase.HogHBaseInventory
 
 
 /**
@@ -92,7 +93,7 @@ object HogSFlow {
   val bigProviderThreshold = 1073741824L // (1*1024*1024*1024 = 1G)
   val icmpTunnelThreshold = 200 // 200b
   val icmpTotalTunnelThreshold = 100000000L // ~100MB
-  val hPortScanMinFlowsThreshold = 10
+  val hPortScanMinFlowsThreshold = 100
   val vPortScanMinPortsThreshold = 3
   val vPortScanPortIntervalThreshold = 1024 // 1 to 1023
   val ddosMinConnectionsThreshold = 20 // Over this, can be considered
@@ -427,13 +428,15 @@ object HogSFlow {
     val stringFlows:String = event.data.get("stringFlows")
     val flowsMean:String = event.data.get("flowsMean")
     val flowsStdev:String = event.data.get("flowsStdev")
-    
+    val numberOfFlowsAlienPort:String = event.data.get("numberOfFlowsAlienPort")
+
     
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
                   "Abnormal behaviour: Horizontal Port Scan \n"+
                   "IP: "+myIP+"\n"+
                   "Number of flows: "+numberOfFlows+"\n"+
                   "Number of flows per AlienPort: "+numberOfFlowsPerPort+"\n"+
+                  "Number of flows per distinct AlienIP/AlienPort: "+numberOfFlowsAlienPort+"\n"+
                   "Mean/Stddev of flows per AlienPort (all flows for this IP): "+flowsMean+"/"+flowsStdev+"\n"+
                   "Bytes Up: "+humanBytes(bytesUp)+"\n"+
                   "Bytes Down: "+humanBytes(bytesDown)+"\n"+
@@ -2158,7 +2161,7 @@ object HogSFlow {
   println("")
   println("Horizontal portscan")
  
-  val hPortScanCollection: PairRDDFunctions[(String,String), (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long,Int)],Long,Long)] = 
+  val hPortScanCollection: PairRDDFunctions[(String,String,String), (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long,Int)],Long,Long,Long)] = 
     sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
                   => !alienPort.equals("80")  &
@@ -2169,66 +2172,74 @@ object HogSFlow {
       case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
          val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long,Int)] = new HashSet()
          flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status))
-        ((myIP,alienPort),(bytesUp,bytesDown,numberPkts,flowSet,1L,sampleRate))
+        ((myIP,alienIP,alienPort),(bytesUp,bytesDown,numberPkts,flowSet,1L,1L,sampleRate))
         })
   
   val hPortScanCollectionFinal=
   hPortScanCollection
   .reduceByKey({
-    case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,sampleRateB)) =>
-      (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB, (sampleRateA+sampleRateB)/2)
+    case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,numberOffPairsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,numberOffPairsB,sampleRateB)) =>
+      (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB,1L, (sampleRateA+sampleRateB)/2)
+  })
+  .map({
+     case ((myIP,alienIP,alienPort),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOffPairsPort,sampleRate)) =>
+        ((myIP,alienPort),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOffPairsPort,sampleRate))
+  })
+  .reduceByKey({
+    case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,numberOffPairsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,numberOffPairsB,sampleRateB)) =>
+      (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB,numberOffPairsA+numberOffPairsB, (sampleRateA+sampleRateB)/2)
   })
   .cache
   
   val hPortScanStats = 
   hPortScanCollectionFinal
-  .map({case ((myIP,alienPort),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,sampleRate)) =>
-        numberOfflows
+  .map({case ((myIP,alienPort),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOffPairsPort,sampleRate)) =>
+        numberOffPairsPort
       }).stats()
   
   
   hPortScanCollectionFinal
-  .filter({case ((myIP,alienPort),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,sampleRate)) =>
-          numberOfflows > hPortScanMinFlowsThreshold
+  .filter({case ((myIP,alienPort),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairsPort,sampleRate)) =>
+          numberOfPairsPort > hPortScanMinFlowsThreshold
     })
   .map({
-     case ((myIP,alienPort),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,sampleRate)) =>
+     case ((myIP,alienPort),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairsPort,sampleRate)) =>
     
          val histogram: Map[String,Double] = new HashMap()
-         histogram.put(alienPort,numberOfflows)
+         histogram.put(alienPort,numberOfPairsPort)
          
-       (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,histogram,sampleRate))
+       (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairsPort,histogram,sampleRate))
   })
   .reduceByKey({
-    case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,histogramA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,histogramB,sampleRateB)) =>
+    case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,numberOfflowsA,numberOfPairsPortA,histogramA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,numberOfflowsB,numberOfPairsPortB,histogramB,sampleRateB)) =>
          
       histogramB./:(0){case  (c,(key,qtdH))=> val qtdH2 = {if(histogramA.get(key).isEmpty) 0D else histogramA.get(key).get }
                                                         histogramA.put(key,  qtdH2 + qtdH) 
                                                         0
                                  }
-      (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB, histogramA,(sampleRateA+sampleRateB)/2)
+      (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, numberOfflowsA+numberOfflowsB,numberOfPairsPortA+numberOfPairsPortB, histogramA,(sampleRateA+sampleRateB)/2)
   })
-  .filter{case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numPorts,sampleRate)) =>
+  .filter{case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairsPort,numPorts,sampleRate)) =>
                    !p2pTalkers.contains(myIP)// Avoid P2P talkers
            }
-  .foreach{case  (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,histogram,sampleRate)) => 
+  .foreach{case  (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,numberOfPairsPort,histogram,sampleRate)) => 
     
                     val savedHistogram=HogHBaseHistogram.getHistogram("HIST07-"+myIP)
                     
                    
-                    if(savedHistogram.histSize< 10)
+                    if(savedHistogram.histSize< 100)
                     {
-                      HogHBaseHistogram.saveHistogram(Histograms.merge(savedHistogram, new HogHistogram("",numberOfflows,histogram)))
+                      HogHBaseHistogram.saveHistogram(Histograms.merge(savedHistogram, new HogHistogram("",numberOfPairsPort,histogram)))
                     }else
                     {
-                          val atypical   = histogram.filter({ case (port,numFlows) =>
+                          val atypical   = histogram.filter({ case (port,numPairsPort) =>
                                                   
                                                   if(savedHistogram.histMap.get(port).isEmpty)
                                                   {
                                                     true // This MyIP never accessed so much distinct Aliens in the same port
                                                   }else
                                                   {
-                                                    if(savedHistogram.histMap.get(port).get.toLong < numFlows)
+                                                    if(savedHistogram.histMap.get(port).get.toLong < numPairsPort)
                                                       true // This MyIP never accessed so much distinct Aliens in the same port
                                                     else
                                                       false // Is typical
@@ -2245,12 +2256,13 @@ object HogSFlow {
                             flowMap.put("flow:id",System.currentTimeMillis.toString)
                             val event = new HogEvent(new HogFlow(flowMap,myIP,"255.255.255.255"))
                             event.data.put("numberOfFlows",numberOfflows.toString)
+                            event.data.put("numberOfFlowsAlienPort",numberOfPairsPort.toString)
                             event.data.put("numberOfFlowsPerPort",atypical.map({case (port,number) => port+"="+number}).mkString("[",", ","]"))
                             event.data.put("myIP", myIP)
                             event.data.put("bytesUp",   (bytesUp*sampleRate).toString)
                             event.data.put("bytesDown", (bytesDown*sampleRate).toString)
                             event.data.put("numberPkts", numberPkts.toString)
-                            event.data.put("stringFlows", setFlows2String(flowSet))
+                            event.data.put("stringFlows", setFlows2String(flowSet.filter({p => atypical.keySet.contains(p._4)})))
                             event.data.put("flowsMean", hPortScanStats.mean.round.toString)
                             event.data.put("flowsStdev", hPortScanStats.stdev.round.toString)
                             
@@ -2413,25 +2425,29 @@ object HogSFlow {
         numberOfflows > ddosMinConnectionsThreshold &
         !p2pTalkers.contains(myIP) &// Avoid P2P talkers
         {
-          val orderedFlowSet=
-          flowSet
-          .map({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) => beginTime})
-          .toIndexedSeq
-          .sortBy { x => x }
-          
-          val flowSetMean=
-          (orderedFlowSet.slice(1, orderedFlowSet.size)
-          .zip(orderedFlowSet.slice(0, orderedFlowSet.size-1))
-          .map({case (a,b) => a-b})
-          .toSeq
-          .sortBy { x => x }
-          .slice(0,orderedFlowSet.size-4)
-          .sum)/(orderedFlowSet.size-4)
-          
-           if(flowSetMean<60)
-            true
-           else
-             false
+          if(flowSet.size>6)
+          {
+              val orderedFlowSet=
+              flowSet
+              .map({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) => beginTime})
+              .toIndexedSeq
+              .sortBy { x => x }
+              
+              val flowSetMean=
+              (orderedFlowSet.slice(1, orderedFlowSet.size)
+              .zip(orderedFlowSet.slice(0, orderedFlowSet.size-1))
+              .map({case (a,b) => a-b})
+              .toSeq
+              .sortBy { x => x }
+              .slice(0,orderedFlowSet.size-4)
+              .sum)/(flowSet.size-4)
+              
+               if(flowSetMean<60)
+                true
+               else
+                 false
+          }else
+          {false}
         }
     })
   .map({case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,sampleRate)) =>
@@ -2464,8 +2480,55 @@ object HogSFlow {
                   
           }
   
+ /*
+  * 
+  * Find Operating Systems
+  * 
+  */
+   
+  println("")
+  println("Find Operating Systems")
+  
+  val osRepos:scala.collection.immutable.Map[String,String] = 
+       HogHBaseReputation.getReputationList("OSRepo", "windows")
+                         .map({case ip => (ip -> "Windows")}).toMap++
+       HogHBaseReputation.getReputationList("OSRepo", "linux")
+                         .map({case ip => (ip -> "Linux OS")}).toMap++
+       HogHBaseReputation.getReputationList("OSRepo", "android")
+                         .map({case ip => (ip -> "Android")}).toMap++
+       HogHBaseReputation.getReputationList("OSRepo", "apple")
+                         .map({case ip => (ip -> "IOS")}).toMap++
+       HogHBaseReputation.getReputationList("OSRepo", "freebsd")
+                         .map({case ip => (ip -> "FreeBSD")}).toMap
+                         
+  val osKeySet = osRepos.keySet
   
   
+  val osCollection: PairRDDFunctions[String, Set[String]] = 
+    sflowSummary
+    .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
+                  => osKeySet.contains(alienIP)
+           })
+    .map({
+      case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
+            (myIP,Set(osRepos.get(alienIP).get))
+        })
+  
+  val osCollectionFinal=
+  osCollection
+  .reduceByKey({
+    case (osA,osB) =>
+      (osA++osB)
+  })
+  .cache
+  
+  osCollectionFinal
+  .foreach{case  (myIP,opSystems) => 
+              opSystems.toArray.distinct
+              .foreach { opSys =>
+                             HogHBaseInventory.saveInventory(myIP, opSys)
+                        }                
+           }
   
   
   // END

@@ -9,6 +9,7 @@ create 'hogzilla_reputation','rep'
 create 'hogzilla_histograms','info','values'
 create 'hogzilla_clusters','info'
 create 'hogzilla_cluster_members','info','member','cluster'
+create 'hogzilla_inventory','info'
 
 put 'hogzilla_mynets', '10.', 'net:description', 'Intranet 1'
 put 'hogzilla_mynets', '10.', 'net:prefix', '10.'

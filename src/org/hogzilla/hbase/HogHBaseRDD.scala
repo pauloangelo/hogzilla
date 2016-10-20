@@ -64,6 +64,7 @@ object HogHBaseRDD {
   val hogzilla_histograms       = new HTable(conf,"hogzilla_histograms")
   val hogzilla_clusters         = new HTable(conf,"hogzilla_clusters")
   val hogzilla_cluster_members  = new HTable(conf,"hogzilla_cluster_members")
+  val hogzilla_inventory        = new HTable(conf,"hogzilla_inventory")
 
   
   def connect(spark: SparkContext):RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)]=
