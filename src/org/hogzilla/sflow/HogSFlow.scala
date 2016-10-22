@@ -1486,6 +1486,9 @@ object HogSFlow {
                                                                savedAlienHistogram = HogHBaseHistogram.getHistogram("HIST05-"+ipSignificantNetwork(alienIP))
                                                              }
                                                              
+                                                             if(savedAlienHistogram.histSize<21)
+                                                               false
+                                                             
                                                              val histogramAlien      = new HashMap[String,Double]
                                                              histogramAlien.put(alienPort, 1D)
                                                              val atypicalAlien   = Histograms.atypical(savedAlienHistogram.histMap, histogramAlien)
@@ -1801,70 +1804,72 @@ object HogSFlow {
                     }) // Consider just if there are more than 4 distinct MyHosts as pairs 
                     {
                     
-                    val histogramBytes = new HashMap[String,Double]
-                    flowSet
-                       .filter({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) =>
-                                myPort.toInt > 1023
-                            })
-                       .map({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) => 
-                                     (floor(log((bytesUp*sampleRate).*(0.0001)+1D)).toString,1D)
-                            })
-                       .toMap
-                       .groupBy(_._1)
-                       .map({
-                        case (group,traversable) =>
-                              traversable.reduce({(a,b) => (a._1,a._2+b._2)})
-                           })
-                       .map({case (key,value) => histogramBytes.put(key,value)})
-                      
-                      val savedHogHistogramBytes=HogHBaseHistogram.getHistogram("HIST06-"+alienNetwork)
-                      HogHBaseHistogram.saveHistogram(Histograms.merge(savedHogHistogramBytes, new HogHistogram("",numberOfFlows,histogramBytes)))
-                      
-                      val maxBytesUp=
+                        val histogramBytes = new HashMap[String,Double]
                         flowSet
-                       .map({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) => 
-                                     bytesUp*sampleRate
-                            }).max
-                       if(maxBytesUp>bigProviderThreshold)
-                       {
-                          HogHBaseReputation.saveReputationList("BigProvider", "whitelist", alienNetwork)
-                       }
-                           
-                    }
-                    // Bytes End
+                           .filter({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) =>
+                                    myPort.toInt > 1023
+                                })
+                           .map({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) => 
+                                         (floor(log((bytesUp*sampleRate).*(0.0001)+1D)).toString,1D)
+                                })
+                           .toMap
+                           .groupBy(_._1)
+                           .map({
+                            case (group,traversable) =>
+                                  traversable.reduce({(a,b) => (a._1,a._2+b._2)})
+                               })
+                           .map({case (key,value) => histogramBytes.put(key,value)})
+                          
+                          val savedHogHistogramBytes=HogHBaseHistogram.getHistogram("HIST06-"+alienNetwork)
+                          HogHBaseHistogram.saveHistogram(Histograms.merge(savedHogHistogramBytes, new HogHistogram("",numberOfFlows,histogramBytes)))
+                          
+                          val maxBytesUp=
+                            flowSet
+                           .map({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) => 
+                                         bytesUp*sampleRate
+                                }).max
+                           if(maxBytesUp>bigProviderThreshold)
+                           {
+                              HogHBaseReputation.saveReputationList("BigProvider", "whitelist", alienNetwork)
+                           }
+                               
+                       
+                        // Bytes End
+                        
                     
                     
-                    
-                    if(savedHogHistogram.histSize < 1000)
-                    {
-                      //println("IP: "+dstIP+ "  (N:"+qtd+",S:"+hogHistogram.histSize+") - Learn More!")
-                      HogHBaseHistogram.saveHistogram(Histograms.merge(savedHogHistogram, new HogHistogram("",numberOfFlows,histogram)))
-                    }else
-                    {
-                          //val KBDistance = Histograms.KullbackLiebler(hogHistogram.histMap, map)
-                          val atypical   = Histograms.atypical(savedHogHistogram.histMap, histogram)
-
-                          if(atypical.size>0)
-                          {
-                            println("Alien Network: "+alienNetwork+ "  (N:"+numberOfFlows+",S:"+savedHogHistogram.histSize+") - Atypical alien network port used: "+atypical.mkString(","))
-                            
-                            /*
-                            val flowMap: Map[String,String] = new HashMap[String,String]
-                            flowMap.put("flow:id",System.currentTimeMillis.toString)
-                            val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(alienNetwork+".0"),
-                                                                         InetAddress.getByName("255.255.255.255").getAddress))
-                            event.data.put("myIP", myIP)
-                            event.data.put("tcpport", atypical.mkString(","))
-                            event.data.put("bytesUp", bytesUp.toString)
-                            event.data.put("bytesDown", bytesDown.toString)
-                            event.data.put("numberPkts", numberPkts.toString)
-                            event.data.put("stringFlows", setFlows2String(flowSet.filter({p => atypical.contains(p._2)})))
-                    
-                            populateAtypicalTCPPortUsed(event).alert()
-                            */
-                          }
-                      HogHBaseHistogram.saveHistogram(Histograms.merge(savedHogHistogram, new HogHistogram("",numberOfFlows,histogram)))
-                    }
+                        if(savedHogHistogram.histSize < 1000)
+                        {
+                          //println("IP: "+dstIP+ "  (N:"+qtd+",S:"+hogHistogram.histSize+") - Learn More!")
+                          HogHBaseHistogram.saveHistogram(Histograms.merge(savedHogHistogram, new HogHistogram("",numberOfFlows,histogram)))
+                        }else
+                        {
+                              //val KBDistance = Histograms.KullbackLiebler(hogHistogram.histMap, map)
+                              val atypical   = Histograms.atypical(savedHogHistogram.histMap, histogram)
+    
+                              if(atypical.size>0)
+                              {
+                                println("Alien Network: "+alienNetwork+ "  (N:"+numberOfFlows+",S:"+savedHogHistogram.histSize+") - Atypical alien network port used: "+atypical.mkString(","))
+                                
+                                /*
+                                val flowMap: Map[String,String] = new HashMap[String,String]
+                                flowMap.put("flow:id",System.currentTimeMillis.toString)
+                                val event = new HogEvent(new HogFlow(flowMap,formatIPtoBytes(alienNetwork+".0"),
+                                                                             InetAddress.getByName("255.255.255.255").getAddress))
+                                event.data.put("myIP", myIP)
+                                event.data.put("tcpport", atypical.mkString(","))
+                                event.data.put("bytesUp", bytesUp.toString)
+                                event.data.put("bytesDown", bytesDown.toString)
+                                event.data.put("numberPkts", numberPkts.toString)
+                                event.data.put("stringFlows", setFlows2String(flowSet.filter({p => atypical.contains(p._2)})))
+                        
+                                populateAtypicalTCPPortUsed(event).alert()
+                                */
+                              }
+                          HogHBaseHistogram.saveHistogram(Histograms.merge(savedHogHistogram, new HogHistogram("",numberOfFlows,histogram)))
+                        }
+                        
+                     }
              }
   
   
@@ -2293,6 +2298,7 @@ object HogSFlow {
     sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
                   => alienPort.toLong < vPortScanPortIntervalThreshold  &
+                     myPort.toLong > 1023 &
                      numberPkts < 5 // few pkts per flow
            })
     .map({
@@ -2431,20 +2437,22 @@ object HogSFlow {
           val orderedFlowSet=
           flowSet
           .map({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) => beginTime})
-          .toIndexedSeq
+          .toArray
           .sortBy { x => x }
+          
+          val orderedFlowSetSize = orderedFlowSet.size
               
           //TODO: Review. You should count the number of equals beginTime and discover why its generating error.
-          if(orderedFlowSet.size>6)
+          if(orderedFlowSetSize>6)
           {  
               val flowSetMean=
-              (orderedFlowSet.slice(1, orderedFlowSet.size)
-              .zip(orderedFlowSet.slice(0, orderedFlowSet.size-1))
+              (orderedFlowSet.slice(1, orderedFlowSetSize)
+              .zip(orderedFlowSet.slice(0, orderedFlowSetSize-1))
               .map({case (a,b) => a-b})
-              .toSeq
+              .toArray
               .sortBy { x => x }
-              .slice(0,orderedFlowSet.size-4)
-              .sum)/(orderedFlowSet.size-4)
+              .slice(0,orderedFlowSetSize-4)
+              .sum)/(orderedFlowSetSize-4)
               
                if(flowSetMean<60)
                 true
@@ -2483,8 +2491,7 @@ object HogSFlow {
                             event.data.put("flowsStdev", ddosStats.stdev.round.toString)
                             
                             // TODO: 
-                           //populateDDoSAttack(event).alert()
-                           
+                           populateDDoSAttack(event).alert()
                   
           }
   
