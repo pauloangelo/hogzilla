@@ -69,7 +69,8 @@ object HogSFlow {
                    HogSignature(3,"HZ: ICMP Tunnel",                           1,1,826001013,826).saveHBase(),//13
                    HogSignature(3,"HZ: Horizontal portscan",                   2,1,826001014,826).saveHBase(),//14
                    HogSignature(3,"HZ: Vertical portscan",                     2,1,826001015,826).saveHBase(),//15
-                   HogSignature(3,"HZ: Server under DDoS attack",              1,1,826001016,826).saveHBase())//16
+                   HogSignature(3,"HZ: Server under DDoS attack",              1,1,826001016,826).saveHBase(),//16
+                   HogSignature(3,"HZ: C&C BotNet communication",              1,1,826001017,826).saveHBase())//17
   
   val alienThreshold = 20
   val topTalkersThreshold:Long = 21474836480L // (20*1024*1024*1024 = 20G)
@@ -98,6 +99,7 @@ object HogSFlow {
   val vPortScanPortIntervalThreshold = 1024 // 1 to 1023
   val ddosMinConnectionsThreshold = 50 // Over this, can be considered
   val ddosMinPairsThreshold = 20
+  val ddosExceptionAlienPorts:Set[String] = Set("80","443","587","465","993","995")
   
   
   
@@ -168,6 +170,8 @@ object HogSFlow {
     val numberPkts:String = event.data.get("numberPkts")
     val stringFlows:String = event.data.get("stringFlows")
     
+    event.ports = "TCP: "+tcpport
+    
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
                   "Abnormal behaviour: Atypical TCP port used ("+tcpport+")\n"+
                   "IP: "+myIP+"\n"+
@@ -190,6 +194,8 @@ object HogSFlow {
     val numberPkts:String = event.data.get("numberPkts")
     val stringFlows:String = event.data.get("stringFlows")
     
+    event.ports = "TCP: "+tcpport
+
     
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
                   "Abnormal behaviour: Atypical alien TCP port used ("+tcpport+")\n"+
@@ -509,6 +515,28 @@ object HogSFlow {
     event
   }
  
+      
+  def populateCCBotNet(event:HogEvent):HogEvent =
+  {
+    val hostname:String = event.data.get("hostname")
+    val bytesUp:String = event.data.get("bytesUp")
+    val bytesDown:String = event.data.get("bytesDown")
+    val numberPkts:String = event.data.get("numberPkts")
+    val stringFlows:String = event.data.get("stringFlows")
+    val connections:String = event.data.get("connections")
+    
+    event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
+                  "Abnormal behaviour: Host C&C BotNet communication. \n"+
+                  "IP: "+hostname+"\n"+
+                  "Bytes Up: "+humanBytes(bytesUp)+"\n"+
+                  "Bytes Down: "+humanBytes(bytesDown)+"\n"+
+                  "Packets: "+numberPkts+"\n"+
+                  "Connections: "+connections+"\n"+
+                  "Flows"+stringFlows
+                  
+    event.signature_id = signature._17.signature_id       
+    event
+  }
   
   def setFlows2String(flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long,Int)]):String =
   {
@@ -2236,7 +2264,7 @@ object HogSFlow {
                    
                     if(savedHistogram.histSize< 100)
                     {
-                      HogHBaseHistogram.saveHistogram(Histograms.merge(savedHistogram, new HogHistogram("",numberOfPairsPort,histogram)))
+                      HogHBaseHistogram.saveHistogram(Histograms.mergeMax(savedHistogram, new HogHistogram("",numberOfPairsPort,histogram)))
                     }else
                     {
                           val atypical   = histogram.filter({ case (port,numPairsPort) =>
@@ -2276,7 +2304,7 @@ object HogSFlow {
                             populateHorizontalPortScan(event).alert()
                           }
                           
-                          HogHBaseHistogram.saveHistogram(Histograms.merge(savedHistogram, new HogHistogram("",numberOfflows,histogram)))
+                          HogHBaseHistogram.saveHistogram(Histograms.mergeMax(savedHistogram, new HogHistogram("",numberOfflows,histogram)))
                     }
              }
   
@@ -2404,7 +2432,8 @@ object HogSFlow {
   val ddosCollection: PairRDDFunctions[(String,String), (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long,Int)],Long,Long)] = 
     sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
-                  => !isMyIP(alienIP, myNets)
+                  => !isMyIP(alienIP, myNets) &
+                     !ddosExceptionAlienPorts.contains(alienPort)
            })
     .map({
       case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
@@ -2494,6 +2523,56 @@ object HogSFlow {
                            populateDDoSAttack(event).alert()
                   
           }
+  
+  
+ 
+  
+   /*
+   * 
+   *  C&C BotNets
+   * 
+   */
+  
+   val ccBotNets = HogHBaseReputation.getReputationList("CCBotNet", "blacklist")
+   
+  println("")
+  println("C&C BotNets")
+
+  val ccBotNetsCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long,Int)],Long,Long)] =
+  sflowSummary
+  .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
+                  =>  
+                      ccBotNets.contains(alienIP)
+           })
+    .map({
+          case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
+               val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long,Int)] = new HashSet()
+               flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status))
+               (myIP,(bytesUp,bytesDown,numberPkts,flowSet,1L,sampleRate))
+        })
+  
+  
+  ccBotNetsCollection
+    .reduceByKey({
+                   case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,connectionsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,connectionsB,sampleRateB)) =>
+                        (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, connectionsA+connectionsB,(sampleRateA+sampleRateB)/2)
+                })
+  .foreach{ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) => 
+                    println("("+myIP+","+bytesUp+")" ) 
+                    val flowMap: Map[String,String] = new HashMap[String,String]
+                    flowMap.put("flow:id",System.currentTimeMillis.toString)
+                    val event = new HogEvent(new HogFlow(flowMap,myIP,"255.255.255.255"))
+                    
+                    event.data.put("hostname", myIP)
+                    event.data.put("bytesUp",   (bytesUp*sampleRate).toString)
+                    event.data.put("bytesDown", (bytesDown*sampleRate).toString)
+                    event.data.put("numberPkts", numberPkts.toString)
+                    event.data.put("connections", connections.toString)
+                    event.data.put("stringFlows", setFlows2String(flowSet)) 
+                    
+                    populateCCBotNet(event).alert()
+           }
+  
   
  /*
   * 

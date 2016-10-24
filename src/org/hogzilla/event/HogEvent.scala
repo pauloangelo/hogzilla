@@ -35,6 +35,8 @@ class HogEvent(flow:HogFlow)
 	var priorityid:Int=0
 	var text:String=""
 	var data:Map[String,String]=new HashMap()
+  var ports:String=""
+  var title:String=""
  
   
   def formatIPtoBytes(ip:String):Array[Byte] =
@@ -57,6 +59,8 @@ class HogEvent(flow:HogFlow)
      put.add(Bytes.toBytes("event"), Bytes.toBytes("upper_ip_str"), Bytes.toBytes(flow.upper_ip))
      put.add(Bytes.toBytes("event"), Bytes.toBytes("signature_id"), Bytes.toBytes("%.0f".format(signature_id)))
      put.add(Bytes.toBytes("event"), Bytes.toBytes("time"), Bytes.toBytes(System.currentTimeMillis))
+     put.add(Bytes.toBytes("event"), Bytes.toBytes("ports"), Bytes.toBytes(ports))
+     put.add(Bytes.toBytes("event"), Bytes.toBytes("title"), Bytes.toBytes(title))
      HogHBaseRDD.hogzilla_events.put(put)
 
      //println(f"ALERT: $text%100s\n\n@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")

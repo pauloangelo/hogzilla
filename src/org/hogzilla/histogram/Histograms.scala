@@ -121,6 +121,28 @@ object Histograms {
     val total = histogram1.histSize+histogram2.histSize
     new HogHistogram(histogram1.histName,total,histogram1.histMap)
   }
+   
+  // It is not exactly a histogram, but... 
+  def mergeMax(histogram1:HogHistogram,histogram2:HogHistogram):HogHistogram = 
+  {
+        
+         
+    val keys = histogram1.histMap.keySet ++ histogram2.histMap.keySet
+    
+    keys./:(0.0){ case (ac,key) =>
+                  val p:Double = { if(histogram1.histMap.get(key).isEmpty) 0 else histogram1.histMap.get(key).get }
+                  val q:Double = { if(histogram2.histMap.get(key).isEmpty) 0 else histogram2.histMap.get(key).get }
+                  
+                  if(p>0 || q>0)
+                  {
+                        histogram1.histMap.put(key,p.max(q))
+                  }
+                  0D
+                }
+    
+    val total = histogram1.histSize+histogram2.histSize
+    new HogHistogram(histogram1.histName,total,histogram1.histMap)
+  }
   
    
   // hist1 - hist2
