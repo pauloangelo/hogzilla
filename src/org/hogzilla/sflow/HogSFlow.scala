@@ -63,7 +63,7 @@ object HogSFlow {
                    HogSignature(3,"HZ: Alien accessing too much hosts",        3,1,826001007,826).saveHBase(),//7
                    HogSignature(3,"HZ: P2P communication",                     3,1,826001008,826).saveHBase(),//8
                    HogSignature(3,"HZ: UDP amplifier (DDoS)",                  1,1,826001009,826).saveHBase(),//9
-                   HogSignature(3,"HZ: Abused SMTP Server",                    1,1,826001010,826).saveHBase(),//10
+                   HogSignature(3,"HZ: Abused SMTP Server",                    2,1,826001010,826).saveHBase(),//10
                    HogSignature(3,"HZ: Media streaming client",                3,1,826001011,826).saveHBase(),//11
                    HogSignature(3,"HZ: DNS Tunnel",                            1,1,826001012,826).saveHBase(),//12
                    HogSignature(3,"HZ: ICMP Tunnel",                           1,1,826001013,826).saveHBase(),//13
@@ -116,7 +116,7 @@ object HogSFlow {
  
   }
   
-  
+  /* Disabled
   def populateTopTalker(event:HogEvent):HogEvent =
   {
     val hostname:String = event.data.get("hostname")
@@ -125,6 +125,9 @@ object HogSFlow {
     val threshold:String = event.data.get("threshold")
     val numberPkts:String = event.data.get("numberPkts")
     val stringFlows:String = event.data.get("stringFlows")
+    val pairs:String = event.data.get("pairs")
+    
+    event.title = "HZ: Top talker identified ("+pairs+" pairs, "+humanBytes(bytesUp)+")"
     
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
                   "Abnormal behaviour: Large amount of sent data (>"+threshold+")\n"+
@@ -137,6 +140,7 @@ object HogSFlow {
     event.signature_id = signature._1.signature_id       
     event
   }
+  * */
   
   def populateSMTPTalker(event:HogEvent):HogEvent =
   {
@@ -146,6 +150,8 @@ object HogSFlow {
     val numberPkts:String = event.data.get("numberPkts")
     val stringFlows:String = event.data.get("stringFlows")
     val connections:String = event.data.get("connections")
+    
+    event.title = "HZ: SMTP talker identified ("+connections+" flows, "+humanBytes(bytesUp)+")"
     
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
                   "Abnormal behaviour: SMTP communication\n"+
@@ -170,6 +176,8 @@ object HogSFlow {
     val numberPkts:String = event.data.get("numberPkts")
     val stringFlows:String = event.data.get("stringFlows")
     
+    event.title = f"HZ: Atypical TCP port used ($tcpport)"
+    
     event.ports = "TCP: "+tcpport
     
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
@@ -193,6 +201,8 @@ object HogSFlow {
     val bytesDown:String = event.data.get("bytesDown")
     val numberPkts:String = event.data.get("numberPkts")
     val stringFlows:String = event.data.get("stringFlows")
+    
+    event.title = f"HZ: Atypical Alien TCP port used ($tcpport)"
     
     event.ports = "TCP: "+tcpport
 
@@ -220,6 +230,8 @@ object HogSFlow {
     val stringFlows:String = event.data.get("stringFlows")
     val pairsMean:String = event.data.get("pairsMean")
     val pairsStdev:String = event.data.get("pairsStdev")
+    
+    event.title = f"HZ: Atypical number of pairs in the period ($numberOfPairs)"
     
     
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
@@ -249,6 +261,8 @@ object HogSFlow {
     val dataMean:String = event.data.get("dataMean")
     val dataStdev:String = event.data.get("dataStdev")
     
+    event.title = "HZ: Atypical amount of data transferred ("+humanBytes(bytesUp)+"/"+humanBytes(bytesDown)+")"
+    
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
                   "Abnormal behaviour: Atypical amount of data uploaded ("+bytesUp+" bytes)\n"+
                   "IP: "+myIP+"\n"+
@@ -272,9 +286,14 @@ object HogSFlow {
     val bytesDown:String = event.data.get("bytesDown")
     val numberPkts:String = event.data.get("numberPkts")
     val stringFlows:String = event.data.get("stringFlows")
+    val ports:String = event.data.get("ports")
+
+    event.title = "HZ: Horizontal scan on ports "+ports
+    
+    event.ports = ports
     
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
-                  "Abnormal behaviour: Alien accessing too much hosts ("+numberOfPairs+")\n"+
+                  "Abnormal behaviour: Alien accessing too much hosts ("+numberOfPairs+"). Possibly a horizontal port scan.\n"+
                   "AlienIP: "+alienIP+"\n"+
                   "Bytes Up: "+humanBytes(bytesUp)+"\n"+
                   "Bytes Down: "+humanBytes(bytesDown)+"\n"+
@@ -295,6 +314,7 @@ object HogSFlow {
     val bytesDown:String = event.data.get("bytesDown")
     val numberPkts:String = event.data.get("numberPkts")
     val stringFlows:String = event.data.get("stringFlows")
+
     
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
                   "Abnormal behaviour: P2P Communication\n"+
@@ -436,6 +456,11 @@ object HogSFlow {
     val flowsMean:String = event.data.get("flowsMean")
     val flowsStdev:String = event.data.get("flowsStdev")
     val numberOfFlowsAlienPort:String = event.data.get("numberOfFlowsAlienPort")
+    val ports:String = event.data.get("ports")
+
+    event.title = "HZ: Horizontal scan on ports "+ports
+    
+    event.ports = ports
 
     
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
@@ -888,6 +913,7 @@ object HogSFlow {
                     event.data.put("numberPkts", numberPkts.toString)
                     event.data.put("threshold", humanBytes(topTalkersThreshold))
                     event.data.put("stringFlows", setFlows2String(flowSet))
+                    event.data.put("pairs", numberOfPairs)
                     
                     populateTopTalker(event).alert()
            }
@@ -1955,6 +1981,14 @@ object HogSFlow {
                             event.data.put("bytesDown", (bytesDown*sampleRate).toString)
                             event.data.put("numberPkts", numberPkts.toString)
                             event.data.put("stringFlows", setFlows2String(flowSet))
+                            event.data.put("ports", "Ports: "+flowSet
+                                              .map({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) =>
+                                                    (proto,myPort)
+                                                   }).toArray
+                                                   .distinct
+                                                   .map({case (proto,myPort) => proto+"/"+myPort})
+                                                   .mkString(", ")
+                                            )
                             
                             populateAlienAccessingManyHosts(event).alert()
                     }
@@ -2300,6 +2334,15 @@ object HogSFlow {
                             event.data.put("stringFlows", setFlows2String(flowSet.filter({p => atypical.keySet.contains(p._4)})))
                             event.data.put("flowsMean", hPortScanStats.mean.round.toString)
                             event.data.put("flowsStdev", hPortScanStats.stdev.round.toString)
+                            
+                            event.data.put("ports", "Ports: "+flowSet
+                                              .map({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) =>
+                                                    (proto,alienPort)
+                                                   }).toArray
+                                                   .distinct
+                                                   .map({case (proto,alienPort) => proto+"/"+alienPort})
+                                                   .mkString(", ")
+                                            )
                             
                             populateHorizontalPortScan(event).alert()
                           }
