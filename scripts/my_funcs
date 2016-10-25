@@ -1,0 +1,43 @@
+#!/bin/bash
+
+function package_installed_cmd {
+    PKGCMD=$1
+    PKGNAME=$2
+    PKGDESC=$3
+
+    $PKGCMD &>/dev/null
+    if [ $? -gt 0 ] ; then
+      msg_warning "$PKGDESC not installed. Installing now..."
+      apt-get -y install $PKGNAME
+      dialog &>/dev/null
+      if [ $? -gt 0 ] ; then
+        msg_ok "$PKGDESC installed."
+      else
+        msg_fail "$PKGDESC installation failed!"
+        die 1 "I could NOT install $PKGDESC. Check your Internet access or try to do it manually!"
+      fi
+    else
+      msg_ok "$PKGDESC installed."
+    fi
+}
+
+function package_installed {
+    PKGNAME=$1
+    PKGDESC=$2
+
+    dpkg -l | awk '{print $2}' | grep $PKGNAME &>/dev/null
+
+    if [ $? -gt 0 ] ; then
+      msg_warning "$PKGDESC not installed. Installing now..."
+      apt-get -y install $PKGNAME
+      dialog &>/dev/null
+      if [ $? -gt 0 ] ; then
+        msg_ok "$PKGDESC installed."
+      else
+        msg_fail "$PKGDESC installation failed!"
+        die 1 "I could NOT install $PKGDESC. Check your Internet access or try to do it manually!"
+      fi
+    else
+      msg_ok "$PKGDESC installed."
+    fi
+}
