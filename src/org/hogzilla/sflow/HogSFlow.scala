@@ -460,7 +460,7 @@ object HogSFlow {
 
     event.title = "HZ: Horizontal scan on ports "+ports
     
-    event.ports = ports
+    event.ports = "Ports: "+ports
 
     
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
@@ -549,10 +549,14 @@ object HogSFlow {
     val numberPkts:String = event.data.get("numberPkts")
     val stringFlows:String = event.data.get("stringFlows")
     val connections:String = event.data.get("connections")
+    val aliens:String = event.data.get("aliens")
+    
+    event.title = "HZ: C&C BotNet communication - "+hostname+" <?> "+aliens
     
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
                   "Abnormal behaviour: Host C&C BotNet communication. \n"+
                   "IP: "+hostname+"\n"+
+                  "Blacklisted aliens: "+aliens+"\n"+
                   "Bytes Up: "+humanBytes(bytesUp)+"\n"+
                   "Bytes Down: "+humanBytes(bytesDown)+"\n"+
                   "Packets: "+numberPkts+"\n"+
@@ -2295,6 +2299,7 @@ object HogSFlow {
     
                     val savedHistogram=HogHBaseHistogram.getHistogram("HIST07-"+myIP)
                     
+                    val hogHistogramOpenPorts=HogHBaseHistogram.getHistogram("HIST01-"+myIP)
                    
                     if(savedHistogram.histSize< 100)
                     {
@@ -2302,7 +2307,12 @@ object HogSFlow {
                     }else
                     {
                           val atypical   = histogram.filter({ case (port,numPairsPort) =>
-                                                  
+                            
+                                                  if(port.equals("25") && Histograms.isTypicalEvent(hogHistogramOpenPorts.histMap, "25"))
+                                                  {
+                                                    false // Avoid FP with SMTP servers
+                                                  }
+                                                    
                                                   if(savedHistogram.histMap.get(port).isEmpty)
                                                   {
                                                     true // This MyIP never accessed so much distinct Aliens in the same port
@@ -2319,7 +2329,7 @@ object HogSFlow {
 
                           if(atypical.size>0)
                           {
-                            println("MyIP: "+myIP+ "  (N:1,S:"+savedHistogram.histSize+") - Horizontal PortScan: "+numberOfflows+" Ports: "+atypical.toString)
+                            println("MyIP: "+myIP+ "  (N:1,S:"+savedHistogram.histSize+") - Horizontal PortScan: "+numberOfflows+", Ports: "+atypical.toString)
                             
                             val flowMap: Map[String,String] = new HashMap[String,String]
                             flowMap.put("flow:id",System.currentTimeMillis.toString)
@@ -2335,7 +2345,7 @@ object HogSFlow {
                             event.data.put("flowsMean", hPortScanStats.mean.round.toString)
                             event.data.put("flowsStdev", hPortScanStats.stdev.round.toString)
                             
-                            event.data.put("ports", "Ports: "+flowSet
+                            event.data.put("ports",flowSet
                                               .map({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) =>
                                                     (proto,alienPort)
                                                    }).toArray
@@ -2581,26 +2591,26 @@ object HogSFlow {
   println("")
   println("C&C BotNets")
 
-  val ccBotNetsCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long,Int)],Long,Long)] =
+  val ccBotNetsCollection: PairRDDFunctions[String, (Set[String],Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long,Int)],Long,Long)] =
   sflowSummary
   .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
-                  =>  
-                      ccBotNets.contains(alienIP)
+                  =>  myPort.toLong > 1023 &
+                      ccBotNets.contains(alienIP) // TODO: Implement a fast approach for this
            })
     .map({
           case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
                val flowSet:HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long,Int)] = new HashSet()
                flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status))
-               (myIP,(bytesUp,bytesDown,numberPkts,flowSet,1L,sampleRate))
+               (myIP,(Set(alienIP),bytesUp,bytesDown,numberPkts,flowSet,1L,sampleRate))
         })
   
   
   ccBotNetsCollection
     .reduceByKey({
-                   case ((bytesUpA,bytesDownA,numberPktsA,flowSetA,connectionsA,sampleRateA),(bytesUpB,bytesDownB,numberPktsB,flowSetB,connectionsB,sampleRateB)) =>
-                        (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, connectionsA+connectionsB,(sampleRateA+sampleRateB)/2)
+                   case ((aliensA,bytesUpA,bytesDownA,numberPktsA,flowSetA,connectionsA,sampleRateA),(aliensB,bytesUpB,bytesDownB,numberPktsB,flowSetB,connectionsB,sampleRateB)) =>
+                        (aliensA++aliensB,bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, connectionsA+connectionsB,(sampleRateA+sampleRateB)/2)
                 })
-  .foreach{ case (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) => 
+  .foreach{ case (myIP,(aliens,bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) => 
                     println("("+myIP+","+bytesUp+")" ) 
                     val flowMap: Map[String,String] = new HashMap[String,String]
                     flowMap.put("flow:id",System.currentTimeMillis.toString)
@@ -2611,6 +2621,7 @@ object HogSFlow {
                     event.data.put("bytesDown", (bytesDown*sampleRate).toString)
                     event.data.put("numberPkts", numberPkts.toString)
                     event.data.put("connections", connections.toString)
+                    event.data.put("aliens", aliens.mkString(","))
                     event.data.put("stringFlows", setFlows2String(flowSet)) 
                     
                     populateCCBotNet(event).alert()
