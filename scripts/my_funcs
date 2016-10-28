@@ -41,3 +41,16 @@ function package_installed {
       msg_ok "$PKGDESC installed."
     fi
 }
+
+function cmd_if_0_info
+{
+    CMDCHECK=$1
+    CMD=$2
+    ELSEMSG=$3
+
+    if [ $? -eq 0 ] ; then
+      cmd $CMD
+    else
+      msg_info $ELSEMSG
+    fi
+}

@@ -93,11 +93,11 @@ dialog --inputbox \
 HADOOPDATA=`head -n1 $TMP_FILE`
 
 package_installed_cmd "wget" "wget" "Wget"
-package_installed_cmd "awk" "gawk" "gawk"
-package_installed_cmd "sed" "sed" "sed"
-package_installed "lynx" "lynx"
+package_installed_cmd "awk"  "gawk" "gawk"
+package_installed_cmd "sed"  "sed"  "sed"
+package_installed     "lynx" "lynx"
 
-wget -o /dev/null $GRAYLOG 
+wget -O /dev/null $GRAYLOG 
 if [ $? -gt 0 ] ; then
   msg_fail "Could not access GrayLog on $GRAYLOG!"
   die 1 "GrayLog could not be accessed. Check the entered URL and try again!"
@@ -105,7 +105,7 @@ else
   msg_ok "Accessing GrayLog correctly on $GRAYLOG!"
 fi
 
-wget -o /dev/null $HZURL
+wget -O /dev/null $HZURL
 if [ $? -gt 0 ] ; then
   msg_fail "Could not access Internet!"
   die 1 "Internet could not be reached! Check the entered information and try again!"
@@ -125,38 +125,61 @@ for pkg in "php5-dev" "php5-cli" "phpunit" ; do
     package_installed $pkg $pkg
 done
  
-# Faz apenas se não fez cada um
-cmd useradd hogzilla
-cmd mkdir -p $HADOOPDATA
-cmd chown hogzilla. $HADOOPDATA
-cmd su hogzilla -c "ssh-keygen -t rsa -f /home/hogzilla/.ssh/id_rsa -q -N '' "
-cmd su hogzilla -c "cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys"
-cmd su hogzilla -c "chmod 0600 ~/.ssh/authorized_keys"
+
+cmd_if_0_info "id hogzilla &>/dev/null" \
+              "useradd hogzilla" \
+              "User hogzilla already exists. Will not try to create it again"
+cmd_if_0_info "id hogzilla &>/dev/null" \
+              "su hogzilla -c \"ssh-keygen -t rsa -f /home/hogzilla/.ssh/id_rsa -q -N '' \"" \
+              "User hogzilla already exists. Will not try to create it again"
+cmd_if_0_info "id hogzilla &>/dev/null" \
+              "su hogzilla -c \"cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys\"" \
+              "User hogzilla already exists. Will not try to create it again"
+cmd_if_0_info "id hogzilla &>/dev/null" \
+              "su hogzilla -c \"chmod 0600 ~/.ssh/authorized_keys\"" \
+              "User hogzilla already exists. Will not try to create it again"
+
+cmd_if_0_info "ls $HADOOPDATA &>/dev/null " \
+              "mkdir -p $HADOOPDATA" \
+              "Directory $HADOOPDATA already exists"
+cmd "chown hogzilla. $HADOOPDATA"
 
 
-# Check JAVA
-
-#Se não existe java, pergunta
-JAVA=true
-
-dialog --yesno \
-"Quer tentar instalar o JAVA?" 20 70
-
-if [ $? -gt 0 ] ; then
-  echo ""
-  msg_warning "OK. You will need to install Oracle's Java later!"
-  JAVA=false
-else
-  echo ""
-  msg_ok "You chose to continue! Let's do it!!!"
-  cmd echo "deb http://ppa.launchpad.net/webupd8team/java/ubuntu precise main" | tee -a /etc/apt/sources.list
-  cmd echo "deb-src http://ppa.launchpad.net/webupd8team/java/ubuntu precise main" | tee -a /etc/apt/sources.list
-  cmd apt-key adv --keyserver keyserver.ubuntu.com --recv-keys EEA14886
-  cmd apt-get update
-  cmd apt-get install oracle-java6-installer
-  cmd apt-get install oracle-java6-set-default
-  #Check java again  
-  JAVA=true
+# JAVA
+java -XshowSettings:properties -version 2>&1 | grep java.vendor | grep Oracle
+if [ $? -eq 0 ] ;then
+  sleep 1
+  dialog --yesno \
+  "You don't have Java/Oracle installed. \n
+Would you like me to install it now? \n
+If NO, you will need to install it later and type \n
+some commands to finish the installation." 20 70
+  
+  if [ $? -gt 0 ] ; then
+    echo ""
+    msg_warning "OK. You will need to install Oracle's Java later!"
+    JAVA=false
+  else
+    echo ""
+    msg_ok "Ok! I'm going to try the Oracle's Java instalation."
+    cmd_if_0_info "grep webupd8team /etc/apt/sources.list" \
+                  "echo \"deb http://ppa.launchpad.net/webupd8team/java/ubuntu precise main\" >> /etc/apt/sources.list" \
+                  "WebUpd8Team already in /etc/apt/sources.list"
+    cmd_if_0_info "grep webupd8team /etc/apt/sources.list" \
+                  "echo \"deb-src http://ppa.launchpad.net/webupd8team/java/ubuntu precise main\" >> /etc/apt/sources.list" \
+                  "WebUpd8Team already in /etc/apt/sources.list"
+    cmd apt-key adv --keyserver keyserver.ubuntu.com --recv-keys EEA14886
+    cmd apt-get update
+    cmd apt-get install oracle-java6-installer
+    cmd apt-get install oracle-java6-set-default
+    
+    java -XshowSettings:properties -version 2>&1 | grep java.vendor | grep Oracle
+    if [ $? -eq 0 ] ;then
+       JAVA=true
+    else
+       die 1 "Sorry, I failed! I could not install Java automatically. Try to install it manually"
+    fi
+  fi
 fi
 
 
@@ -167,37 +190,45 @@ sleep 1
 # Hadoop
 # Install
 # Check
+HADOOP_VERSION="2.7.3"
+HBASE_VERSION="1.2.3"
+http://www.us.apache.org/dist/hadoop/common/hadoop-$HADOOP_VERSION/hadoop-$HADOOP_VERSION.tar.gz
 cmd su hogzilla -c "mkdir /home/hogzilla/app"
 cmd su hogzilla -c "cd /home/hogzilla/app"
-cmd su hogzilla -c "wget 'http://www.us.apache.org/dist/hadoop/common/stable/hadoop-2.7.1.tar.gz'" # Colocar diretório de saída
-cmd su hogzilla -c "tar xzvf hadoop-2.7.1.tar.gz" # Colocar diretório de saída
-cmd su hogzilla -c "mv hadoop-2.7.1 /home/hogzilla/hadoop"
-cmd su hogzilla -c "wget -c 'http://www.us.apache.org/dist/hbase/stable/hbase-1.1.2-bin.tar.gz'"
-cmd su hogzilla -c "tar xzvf hbase-1.1.2-bin.tar.gz" # Colocar diretório de saída
-cmd su hogzilla -c "mv hbase-1.1.2 /home/hogzilla/hbase"
-#Verifica tudo
+cmd su hogzilla -c "wget -O /home/hogzilla/app/hadoop-$HADOOP_VERSION.tar.gz  
+                    'http://www.us.apache.org/dist/hadoop/common/hadoop-$HADOOP_VERSION/hadoop-$HADOOP_VERSION.tar.gz'"
 
-echo 'export HADOOP_HOME=/home/hogzilla/hadoop' >> ~/.bashrc
-echo 'export HADOOP_MAPRED_HOME=$HADOOP_HOME' >> ~/.bashrc
-echo 'export HADOOP_COMMON_HOME=$HADOOP_HOME' >> ~/.bashrc
-echo 'export HADOOP_HDFS_HOME=$HADOOP_HOME' >> ~/.bashrc
-echo 'export YARN_HOME=$HADOOP_HOME' >> ~/.bashrc
-echo 'export HADOOP_COMMON_LIB_NATIVE_DIR=$HADOOP_HOME/lib/native' >> ~/.bashrc
-echo 'export PATH=$PATH:$HADOOP_HOME/sbin:$HADOOP_HOME/bin' >> ~/.bashrc
-echo 'export HADOOP_INSTALL=$HADOOP_HOME' >> ~/.bashrc
-echo 'export HADOOP_OPTS="-Djava.library.path=$HADOOP_HOME/lib"' >> ~/.bashrc
-echo 'export HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop' >> ~/.bashrc
-source ~/.bashrc
+file_exists "/home/hogzilla/app/hadoop-$HADOOP_VERSION.tar.gz" || die 1 "Coult not download hadoop-$HADOOP_VERSION.tar.gz"
 
+cmd su hogzilla -c "tar xzvf /home/hogzilla/app/hadoop-$HADOOP_VERSION.tar.gz
+                    -C /home/hogzilla/hadoop"
 
+cmd su hogzilla -c "wget -O /home/hogzilla/app/hbase-$HBASE_VERSION-bin.tar.gz
+                    'http://www.us.apache.org/dist/hbase/$HBASE_VERSION/hbase-$HBASE_VERSION-bin.tar.gz'"
 
-cd $HADOOP_HOME/etc/hadoop
-echo 'export JAVA_HOME=/usr/java/jdk1.7.0_79/' >> hadoop-env.sh
+file_exists "/home/hogzilla/app/hbase-$HBASE_VERSION-bin.tar.gz" || die 1 "Coult not download hbase-$HBASE_VERSION-bin.tar.gz"
+cmd su hogzilla -c "tar xzvf /home/hogzilla/app/hbase-$HBASE_VERSION-bin.tar.gz
+                    -C /home/hogzilla/hbase"
 
-cp -i core-site.xml core-site.xml-original
-cp -i hdfs-site.xml hdfs-site.xml-original
-cp -i yarn-site.xml yarn-site.xml-original
-cp -i mapred-site.xml.template mapred-site.xml
+cmd su hogzilla -c "echo 'export HADOOP_HOME=/home/hogzilla/hadoop'                    >> ~/.bashrc"
+cmd su hogzilla -c "echo 'export HADOOP_MAPRED_HOME=$HADOOP_HOME'                      >> ~/.bashrc"
+cmd su hogzilla -c "echo 'export HADOOP_COMMON_HOME=$HADOOP_HOME'                      >> ~/.bashrc"
+cmd su hogzilla -c "echo 'export HADOOP_HDFS_HOME=$HADOOP_HOME'                        >> ~/.bashrc"
+cmd su hogzilla -c "echo 'export YARN_HOME=$HADOOP_HOME'                               >> ~/.bashrc"
+cmd su hogzilla -c "echo 'export HADOOP_COMMON_LIB_NATIVE_DIR=$HADOOP_HOME/lib/native' >> ~/.bashrc"
+cmd su hogzilla -c "echo 'export PATH=$PATH:$HADOOP_HOME/sbin:$HADOOP_HOME/bin'        >> ~/.bashrc"
+cmd su hogzilla -c "echo 'export HADOOP_INSTALL=$HADOOP_HOME'                          >> ~/.bashrc"
+cmd su hogzilla -c "echo 'export HADOOP_OPTS=\"-Djava.library.path=$HADOOP_HOME/lib\"' >> ~/.bashrc"
+cmd su hogzilla -c "echo 'export HADOOP_CONF_DIR=$HADOOP_HOME/etc/hadoop'              >> ~/.bashrc"
+
+export HADOOP_HOME=/home/hogzilla/hadoop
+#echo 'export JAVA_HOME=/usr/java/jdk1.7.0_79/' >> $HADOOP_HOME/etc/hadoop/hadoop-env.sh
+cmd grep JAVA_HOME /etc/profile >> $HADOOP_HOME/etc/hadoop/hadoop-env.sh
+
+#cp -i core-site.xml core-site.xml-original
+#cp -i hdfs-site.xml hdfs-site.xml-original
+#cp -i yarn-site.xml yarn-site.xml-original
+#cp -i mapred-site.xml.template mapred-site.xml
 
 
 Put the lines below inside “configuration” tags in core-site.xml
@@ -238,9 +269,9 @@ Put the lines below inside “configuration” tags in mapred-site.xml
 
 Initiate HDFS and Start Hadoop
 
-hdfs namenode -format
-start-dfs.sh
-start-yarn.sh
+cmd su hogzilla -c "hdfs namenode -format"
+cmd su hogzilla -c "start-dfs.sh"
+cmd su hogzilla -c "start-yarn.sh"
 
 Configure HBase
 
@@ -251,6 +282,8 @@ echo 'export JAVA_HOME=/usr/java/jdk1.7.0_79/' >> hbase-env.sh
 
 Put the lines below inside “configuration” tags in hbase-site.xml
 
+sed -i.original hbase-site.xml \
+-e 's/xxx/
 <property>
     <name>zookeeper.znode.rootserver</name>
     <value>localhost</value>
@@ -276,6 +309,7 @@ Put the lines below inside “configuration” tags in hbase-site.xml
     <name>hbase.thrift.connection.max-idletime</name>
     <value>1800000</value>
 </property>
+/' 
 
 
 
@@ -290,7 +324,7 @@ Create Hogzilla tables in HBase
 
 Inside HBase Shell
 
-# Baixar direto do GIT
+# Baixar direto do GIT???
 create 'hogzilla_flows','flow','event'
 create 'hogzilla_events','event'
 create 'hogzilla_sensor','sensor'
@@ -300,8 +334,6 @@ More variables in ./.bashrc
 
 echo 'export CLASSPATH=$CLASSPATH:/home/hogzilla/hbase/lib/*' >> ~/.bashrc
 source ~/.bashrc
-
-
 
 
 cd /home/hogzilla/app
