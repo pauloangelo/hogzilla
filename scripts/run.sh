@@ -1,4 +1,4 @@
 #!/bin/bash
 
-cd ../src
+cd ../bin
 jar -cf /tmp/Hogzilla.jar *

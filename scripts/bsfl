@@ -524,7 +524,8 @@ cmd () {
     COMMAND="$1"
     msg "Executing: $COMMAND"
 
-    RESULT=`$COMMAND 2>&1`
+    RESULT=`eval $COMMAND 2>&1`
+    msg "$RESULT"
     ERROR="$?"
 
     MSG="Command: ${COMMAND:0:29}..."
@@ -641,6 +642,35 @@ function str_replace_in_file () {
 
     printf ",s/$ORIG/$DEST/g\nw\nQ" | ed -s "$FILE" > /dev/null 2>&1
     return "$?"
+}
+
+cmd_su () {
+
+    USER="$1"
+    COMMAND="$2"
+
+    msg "Executing: $COMMAND"
+
+    RESULT=`su $USER -c "$COMMAND" 2>&1`
+    ERROR="$?"
+
+    MSG="Command: ${COMMAND:0:29}..."
+    
+    tput cuu1
+
+    if [ "$ERROR" == "0" ]
+    then
+        msg_ok "$MSG"
+        if [ "$DEBUG" == "1" ]
+        then
+            msg "$RESULT"
+        fi
+    else
+        msg_fail "$MSG"
+        log "$RESULT"
+    fi
+
+    return "$ERROR"
 }
 
 init
