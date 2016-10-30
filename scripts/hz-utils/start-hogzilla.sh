@@ -2,7 +2,7 @@
 
 # Confira as variaveis abaixo
 HBASE_PATH=/home/hogzilla/hbase
-HBASE_VERSION="1.1.5"
+HBASE_VERSION="1.2.3"
 
 (while : ; do 
      #cd /home/hogzilla

@@ -412,7 +412,7 @@ cmd "echo \"exit\"                          >> /tmp/.hogzilla_hbase_script"
 
 cmd "chown hogzilla. /tmp/.hogzilla_hbase_script"
 cmd_su "hogzilla" "$HBASE_HOME/bin/hbase shell /tmp/.hogzilla_hbase_script"
-#cmd "rm -f /tmp/.hogzilla_hbase_script"
+cmd "rm -f /tmp/.hogzilla_hbase_script"
 
 # Thrift
 cmd "apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 379CE192D401AB61"
@@ -440,15 +440,18 @@ file_exists "/home/hogzilla/Hogzilla.jar" || die 1 "Coult not download Hogzilla-
 # Pigtail
 cmd_su "hogzilla" "wget -c -O /home/hogzilla/app/pigtail-v1.1-latest.tar.gz '$HZURL/downloads/pigtail-v1.1-latest.tar.gz'"
 file_exists "/home/hogzilla/app/pigtail-v1.1-latest.tar.gz" || die 1 "Coult not download pigtail-v1.1-latest.tar.gz"
-cmd_su "hogzilla" "tar xzf /home/hogzilla/app/pigtail-v1.1-latest.tar.gz -C /home/hogzilla/pigtail"
+cmd_su "hogzilla" "tar xzf /home/hogzilla/app/pigtail-v1.1-latest.tar.gz -C /home/hogzilla/"
 
 directory_exists "/usr/lib/php/Thrift/Packages/" || mkdir /usr/lib/php/Thrift/Packages/
 directory_exists "/home/hogzilla/pigtail/gen-php/Hbase/" || cmd "mv /home/hogzilla/pigtail/gen-php/Hbase/ /usr/lib/php/Thrift/Packages/"
 
+# GRAYLOG INTO PIGTAIL, CONFIGURE
+
 # Hogzilla utils
 cmd_su "hogzilla" "wget -c -O /home/hogzilla/app/hz-utils-v1.0-latest.tar.gz '$HZURL/downloads/hz-utils-v1.0-latest.tar.gz'"
 file_exists "/home/hogzilla/app/hz-utils-v1.0-latest.tar.gz" || die 1 "Coult not download hz-utils-v1.0-latest.tar.gz"
-cmd_su "hogzilla" "tar xzf /home/hogzilla/app/hz-utils-v1.0-latest.tar.gz -C /home/hogzilla/bin"
+cmd_su "hogzilla" "tar xzf /home/hogzilla/app/hz-utils-v1.0-latest.tar.gz -C /home/hogzilla/"
+directory_exists "/home/hogzilla/hz-utils/" && cmd_su "hogzilla" "mv -f /home/hogzilla/hz-utils/* /home/hogzilla/bin/"
 
 cmd_su "hogzilla" "sed -i.original /home/hogzilla/bin/start-hogzilla.sh -e \"s#HBASE_VERSION=.1.1.5.#HBASE_VERSION='$HBASE_VERSION'#\""
 
@@ -457,7 +460,6 @@ cmd_su "hogzilla" "wget --no-check-certificate -c -O /home/hogzilla/app/sflowtoo
 file_exists "/home/hogzilla/app/sflowtool-$SFLOWTOOL_VERSION.tar.gz" || die 1 "Coult not download sflowtool-$SFLOWTOOL_VERSION.tar.gz"
 directory_exists "/home/hogzilla/sflowtool-$SFLOWTOOL_VERSION" && cmd "rm -rf /home/hogzilla/sflowtool-$SFLOWTOOL_VERSION"
 cmd_su "hogzilla" "tar xzf /home/hogzilla/app/sflowtool-$SFLOWTOOL_VERSION.tar.gz -C /home/hogzilla/"
-cmd_su "hogzilla" "cd /home/hogzilla/sflowtool-$SFLOWTOOL_VERSION ; ./boot.sh"
 cmd_su "hogzilla" "cd /home/hogzilla/sflowtool-$SFLOWTOOL_VERSION ; ./configure"
 cmd_su "hogzilla" "cd /home/hogzilla/sflowtool-$SFLOWTOOL_VERSION ; make"
 cmd "cd /home/hogzilla/sflowtool-$SFLOWTOOL_VERSION ; make install"
@@ -469,19 +471,20 @@ cmd_su "hogzilla" "/home/hogzilla/bin/start-sflow2hz.sh  &"
 cmd_su "hogzilla" "/home/hogzilla/bin/start-dbupdates.sh &"
 
 cmd_if_n0_info "grep start-all.sh /etc/rc.local" \
-               "echo '/home/hogzilla/bin/start-all.sh &' >> /etc/rc.local" \
+               "sed -i.original /etc/rc.local -e 's#exit 0#/home/hogzilla/bin/start-all.sh \&\nexit 0#'" \
               "/etc/rc.local already updated"
 
+               #"echo '/home/hogzilla/bin/start-all.sh &' >> /etc/rc.local" \
 whiptail --title "YOU WILL NEED" --msgbox \
 "
 Now, to make everything run, you will need:\n
 \n
-1) Create an input at your GrayLog XXXX\n
-2) Configure your router to send SFlows to Hogzilla's IP\n
+1) Create an input at your GrayLog*\n
+2) Configure your router to send SFlows to Hogzilla's IP*\n
 3) Wait some time for data collection and processing\n
+4) You can also send sFlows directly to GrayLog. It can be used to incident analysis.\n
 \n
-You can also send sFlows directly to GrayLog. It can be used to incident analysis.
-Know how you can do this at $HZURL
+*Know how you can do these at $HZURL
 \n
 \n
 " 20 70 
