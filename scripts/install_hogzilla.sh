@@ -103,7 +103,7 @@ export http_proxy=$PROXY
 
 whiptail --inputbox \
 "Enter your GrayLog server IP (e.g. 10.1.1.1):" 20 70 "10.1.1.1" 2> $TMP_FILE
-GRAYLOG=`head -n1 $TMP_FILE`
+GRAYLOGHOST=`head -n1 $TMP_FILE`
 
 whiptail --inputbox \
 "Enter the Hadoop Data path (you need at least 50G):" 20 70 "/home/hogzilla/hadoop_data" 2> $TMP_FILE
@@ -121,12 +121,12 @@ package_install_cmd "wget -h" "wget" "Wget"
 package_install_cmd "awk --help"  "gawk" "gawk"
 package_install_cmd "sed --help"  "sed"  "sed"
 
-#wget -O /dev/null $GRAYLOG  # It is not an URL
+#wget -O /dev/null $GRAYLOGHOST  # It is not an URL
 #if [ $? -gt 0 ] ; then
-#  msg_fail "Could not access GrayLog on $GRAYLOG!"
+#  msg_fail "Could not access GrayLog on $GRAYLOGHOST!"
 #  die 1 "GrayLog could not be accessed. Check the entered URL and try again!"
 #else
-#  msg_ok "Accessing GrayLog correctly on $GRAYLOG!"
+#  msg_ok "Accessing GrayLog correctly on $GRAYLOGHOST!"
 #fi
 
 wget -q -O /dev/null "$HZURL/testing"
@@ -442,10 +442,10 @@ cmd_su "hogzilla" "wget -c -O /home/hogzilla/app/pigtail-v1.1-latest.tar.gz '$HZ
 file_exists "/home/hogzilla/app/pigtail-v1.1-latest.tar.gz" || die 1 "Coult not download pigtail-v1.1-latest.tar.gz"
 cmd_su "hogzilla" "tar xzf /home/hogzilla/app/pigtail-v1.1-latest.tar.gz -C /home/hogzilla/"
 
-directory_exists "/usr/lib/php/Thrift/Packages/" || mkdir /usr/lib/php/Thrift/Packages/
-directory_exists "/home/hogzilla/pigtail/gen-php/Hbase/" || cmd "mv /home/hogzilla/pigtail/gen-php/Hbase/ /usr/lib/php/Thrift/Packages/"
+directory_exists "/usr/lib/php/Thrift/Packages/" || cmd "mkdir /usr/lib/php/Thrift/Packages/"
+directory_exists "/home/hogzilla/pigtail/gen-php/Hbase/" || cmd "cp -a /home/hogzilla/pigtail/gen-php/Hbase/ /usr/lib/php/Thrift/Packages/"
 
-# GRAYLOG INTO PIGTAIL, CONFIGURE
+file_exists "/home/hogzilla/pigtail/pigtail.php" && "sed -i.original /home/hogzilla/pigtail/pigtail.php -e 's#grayloghost#$GRAYLOGHOST#'"
 
 # Hogzilla utils
 cmd_su "hogzilla" "wget -c -O /home/hogzilla/app/hz-utils-v1.0-latest.tar.gz '$HZURL/downloads/hz-utils-v1.0-latest.tar.gz'"
@@ -474,7 +474,6 @@ cmd_if_n0_info "grep start-all.sh /etc/rc.local" \
                "sed -i.original /etc/rc.local -e 's#exit 0#/home/hogzilla/bin/start-all.sh \&\nexit 0#'" \
               "/etc/rc.local already updated"
 
-               #"echo '/home/hogzilla/bin/start-all.sh &' >> /etc/rc.local" \
 whiptail --title "YOU WILL NEED" --msgbox \
 "
 Now, to make everything run, you will need:\n
