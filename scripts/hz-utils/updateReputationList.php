@@ -33,10 +33,10 @@
 */
 
 // Some useful variables
-$hbaseHost="hoghbasehost"; /* Host or IP of your HBase  */
+$hbaseHost="localhost"; /* Host or IP of your HBase  */
 $hbasePort=9090;
 
-$GLOBALS['THRIFT_ROOT'] = '/usr/lib/php';
+$GLOBALS['THRIFT_ROOT'] = '/usr/share/php';
 
 define("DEBUG",true);
 
