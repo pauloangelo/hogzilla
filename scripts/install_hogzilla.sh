@@ -142,7 +142,7 @@ fi
 #Install dependencies
 package_install "ssh" "ssh"
 
-for pkg in "php5-cli" ; do
+for pkg in "php5-cli" "host" ; do
     package_install $pkg $pkg
 done
  
@@ -165,6 +165,11 @@ if [ $? -gt 0 ] ; then
 cmd_su "hogzilla" "ssh-keyscan localhost >> ~/.ssh/known_hosts"
 fi
 
+grep "^0.0.0.0" /home/hogzilla/.ssh/known_hosts >/dev/null
+if [ $? -gt 0 ] ; then
+cmd_su "hogzilla" "ssh-keyscan 0.0.0.0 >> ~/.ssh/known_hosts"
+fi
+
 cmd_if_n0_info "ls $HADOOPDATA" \
               "mkdir -p $HADOOPDATA" \
               "Directory $HADOOPDATA already exists"
@@ -179,7 +184,7 @@ else
 fi
 
 # JAVA
-ps auxw | grep java | grep hogzilla | awk '{print $2}' | xargs kill
+ps auxw | grep java | grep hogzilla | awk '{print $2}' | xargs kill &>/dev/null
 
 java -XshowSettings:properties -version 2>&1 | grep java.vendor | grep Oracle >/dev/null
 if [ $? -gt 0 ] ; then
@@ -375,7 +380,7 @@ cmd_if_n0_info "ls $HADOOPDATA/hdfs/namenode/" \
               "su hogzilla -c '/home/hogzilla/hadoop/bin/hdfs namenode -format'" \
               "Hadoop Data already formated"
 
-ps auxw | grep java | grep hogzilla | awk '{print $2}' | xargs kill -9
+ps auxw | grep java | grep hogzilla | awk '{print $2}' | xargs kill -9 &>/dev/null
 cmd "sleep 1"
 cmd_su "hogzilla" "$HBASE_HOME/bin/hbase-daemon.sh stop thrift"
 cmd_su "hogzilla" "$HBASE_HOME/bin/stop-hbase.sh"
@@ -449,8 +454,8 @@ cmd_su "hogzilla" "wget -c -O /home/hogzilla/app/pigtail-v1.1-latest.tar.gz '$HZ
 file_exists "/home/hogzilla/app/pigtail-v1.1-latest.tar.gz" || die 1 "Coult not download pigtail-v1.1-latest.tar.gz"
 cmd_su "hogzilla" "tar xzf /home/hogzilla/app/pigtail-v1.1-latest.tar.gz -C /home/hogzilla/"
 
-directory_exists "/usr/lib/php/Thrift/Packages/" || cmd "mkdir /usr/lib/php/Thrift/Packages/"
-directory_exists "/home/hogzilla/pigtail/gen-php/Hbase/" || cmd "cp -a /home/hogzilla/pigtail/gen-php/Hbase/ /usr/lib/php/Thrift/Packages/"
+directory_exists "/usr/share/php/Thrift/Packages/" || cmd "mkdir /usr/share/php/Thrift/Packages/"
+directory_exists "/home/hogzilla/pigtail/gen-php/Hbase/" && cmd "cp -a /home/hogzilla/pigtail/gen-php/Hbase/ /usr/share/php/Thrift/Packages/"
 
 file_exists "/home/hogzilla/pigtail/pigtail.php" && "sed -i.original /home/hogzilla/pigtail/pigtail.php -e 's#grayloghost#$GRAYLOGHOST#'"
 
@@ -467,15 +472,15 @@ cmd_su "hogzilla" "wget --no-check-certificate -c -O /home/hogzilla/app/sflowtoo
 file_exists "/home/hogzilla/app/sflowtool-$SFLOWTOOL_VERSION.tar.gz" || die 1 "Coult not download sflowtool-$SFLOWTOOL_VERSION.tar.gz"
 directory_exists "/home/hogzilla/sflowtool-$SFLOWTOOL_VERSION" && cmd "rm -rf /home/hogzilla/sflowtool-$SFLOWTOOL_VERSION"
 cmd_su "hogzilla" "tar xzf /home/hogzilla/app/sflowtool-$SFLOWTOOL_VERSION.tar.gz -C /home/hogzilla/"
-cmd_su "hogzilla" "cd /home/hogzilla/sflowtool-$SFLOWTOOL_VERSION ; ./configure"
-cmd_su "hogzilla" "cd /home/hogzilla/sflowtool-$SFLOWTOOL_VERSION ; make"
-cmd "cd /home/hogzilla/sflowtool-$SFLOWTOOL_VERSION ; make install"
+su hogzilla -c "cd /home/hogzilla/sflowtool-$SFLOWTOOL_VERSION ; ./configure"
+su hogzilla -c "cd /home/hogzilla/sflowtool-$SFLOWTOOL_VERSION ; make"
+cd /home/hogzilla/sflowtool-$SFLOWTOOL_VERSION ; make install
 
 msg_notice "I'm going to start sFlow collector, Hogzilla processing, DBUpdates and PigTail."
-cmd_su "hogzilla" "/home/hogzilla/bin/start-pigtail.sh   &"
-cmd_su "hogzilla" "/home/hogzilla/bin/start-hogzilla.sh  &"
-cmd_su "hogzilla" "/home/hogzilla/bin/start-sflow2hz.sh  &"
-cmd_su "hogzilla" "/home/hogzilla/bin/start-dbupdates.sh &"
+su - hogzilla -c "/home/hogzilla/bin/start-pigtail.sh"
+su - hogzilla -c "/home/hogzilla/bin/start-hogzilla.sh"
+su - hogzilla -c "/home/hogzilla/bin/start-sflow2hz.sh"
+su - hogzilla -c "/home/hogzilla/bin/start-dbupdates.sh"
 
 cmd_if_n0_info "grep start-all.sh /etc/rc.local" \
                "sed -i.original /etc/rc.local -e 's#exit 0#/home/hogzilla/bin/start-all.sh \&\nexit 0#'" \

@@ -25,7 +25,7 @@ function package_install {
     PKGNAME=$1
     PKGDESC=$2
 
-    dpkg -l | awk '{print $2}' | grep $PKGNAME &>/dev/null
+    dpkg -l | awk '{print $2}' | grep ^$PKGNAME$ &>/dev/null
     if [ $? -gt 0 ] ; then
       msg_info "$PKGDESC not installed. Installing now..."
       apt-get --force-yes -y install $PKGNAME
