@@ -457,7 +457,7 @@ cmd_su "hogzilla" "tar xzf /home/hogzilla/app/pigtail-v1.1-latest.tar.gz -C /hom
 directory_exists "/usr/share/php/Thrift/Packages/" || cmd "mkdir /usr/share/php/Thrift/Packages/"
 directory_exists "/home/hogzilla/pigtail/gen-php/Hbase/" && cmd "cp -a /home/hogzilla/pigtail/gen-php/Hbase/ /usr/share/php/Thrift/Packages/"
 
-file_exists "/home/hogzilla/pigtail/pigtail.php" && "sed -i.original /home/hogzilla/pigtail/pigtail.php -e 's#grayloghost#$GRAYLOGHOST#'"
+file_exists "/home/hogzilla/pigtail/pigtail.php" && sed -i.original /home/hogzilla/pigtail/pigtail.php -e 's#grayloghost#$GRAYLOGHOST#'
 
 # Hogzilla utils
 cmd_su "hogzilla" "wget -c -O /home/hogzilla/app/hz-utils-v1.0-latest.tar.gz '$HZURL/downloads/hz-utils-v1.0-latest.tar.gz'"

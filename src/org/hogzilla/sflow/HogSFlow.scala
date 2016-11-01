@@ -526,7 +526,7 @@ object HogSFlow {
     
     
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
-                  "Abnormal behaviour: Horizontal Port Scan \n"+
+                  "Abnormal behaviour: Host possibly under DDoS attack.\n"+
                   "IP: "+myIP+"\n"+
                   "Number of Attackers: "+numberOfAttackers+"\n"+
                   "Number of flows: "+numberOfFlows+"\n"+
