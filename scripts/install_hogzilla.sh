@@ -417,13 +417,20 @@ cmd "rm -f /tmp/.hogzilla_hbase_script"
 # Thrift
 cmd "apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 379CE192D401AB61"
 
-cmd_if_n0_info "grep dl.bintray.com /etc/apt/sources.list" \
-               "echo 'deb http://dl.bintray.com/apache/thrift/debian/ 0.9.3 main' >> /etc/apt/sources.list" \
-               "bintray.com already in /etc/apt/sources.list"
+
+cmd "wget -q -O/etc/apt/trusted.gpg.d/altern-deb-jessie-stable.gpg https://altern-deb.com/debian/package-signing-key@altern-deb.com.gpg"
+
+cmd_if_n0_info "grep altern-deb /etc/apt/sources.list" \
+               "echo 'deb http://altern-deb.com/debian/  jessie  main' >> /etc/apt/sources.list" \
+               "altern-deb.com already in /etc/apt/sources.list"
+
+#cmd_if_n0_info "grep dl.bintray.com /etc/apt/sources.list" \
+#               "echo 'deb http://dl.bintray.com/apache/thrift/debian/ 0.9.3 main' >> /etc/apt/sources.list" \
+#               "bintray.com already in /etc/apt/sources.list"
 
 apt-get update
 
-for pkg in "php5-thrift" "gcc" "automake" "autoconf" "make" ; do
+for pkg in "php5-thrift" "gcc" "automake" "autoconf" "make" "libthrift0"; do
     package_install "$pkg" "$pkg"
 done
 

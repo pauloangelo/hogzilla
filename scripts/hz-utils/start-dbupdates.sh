@@ -1,15 +1,21 @@
 #!/bin/bash
 
-SOURCE="${BASH_SOURCE[0]}"
+BIN="/home/hogzilla/bin"
 
-echo $SOURCE
+cd $BIN
 
-exit
+(
+while : ; do
+    $BIN/genCnCList.sh > /tmp/cclist.temp
+    php $BIN/updateReputationList.php -t blacklist -n CCBotNet -f /tmp/cclist.temp
+    rm /tmp/cclist.temp
+    
+    for os in windows linux freebsd android apple ; do
+      $BIN/getReposList.sh $os > /tmp/$os.txt
+      php $BIN/updateReputationList.php -t $os -n OSRepo -f /tmp/$os.txt
+      rm -f /tmp/$os.txt
+    done
 
-./genCnCList.sh > /tmp/cclist.temp
-php updateReputationList.php -t blacklist -n CCBotNet -f /tmp/cclist.temp
-
-for os in windows linux freebsd android apple ; do
-  ./getReposList.sh $os > /tmp/$os.txt
-  php updateReputationList.php -t $os -n OSRepo -f /tmp/$os.txt
+    sleep 86400 # daily
 done
+)&
