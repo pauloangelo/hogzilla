@@ -95,13 +95,13 @@ object HogSFlow {
   val icmpTunnelThreshold = 200 // 200b
   val icmpTotalTunnelThreshold = 100000000L // ~100MB
   val hPortScanMinFlowsThreshold = 100
+  val hPortScanExceptionPorts = Set("80","443","53")
+  val hPortScanExceptionInternalPorts = Set("123")
   val vPortScanMinPortsThreshold = 3
   val vPortScanPortIntervalThreshold = 1024 // 1 to 1023
   val ddosMinConnectionsThreshold = 50 // Over this, can be considered
   val ddosMinPairsThreshold = 20
   val ddosExceptionAlienPorts:Set[String] = Set("80","443","587","465","993","995")
-  
-  
   
   
   /**
@@ -290,7 +290,7 @@ object HogSFlow {
 
     event.title = "HZ: Horizontal scan on ports "+ports
     
-    event.ports = ports
+    event.ports = "Ports: "+ports
     
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
                   "Abnormal behaviour: Alien accessing too much hosts ("+numberOfPairs+"). Possibly a horizontal port scan.\n"+
@@ -1985,7 +1985,7 @@ object HogSFlow {
                             event.data.put("bytesDown", (bytesDown*sampleRate).toString)
                             event.data.put("numberPkts", numberPkts.toString)
                             event.data.put("stringFlows", setFlows2String(flowSet))
-                            event.data.put("ports", "Ports: "+flowSet
+                            event.data.put("ports",flowSet
                                               .map({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) =>
                                                     (proto,myPort)
                                                    }).toArray
@@ -2236,9 +2236,9 @@ object HogSFlow {
   val hPortScanCollection: PairRDDFunctions[(String,String,String), (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long,Int)],Long,Long,Long)] = 
     sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
-                  => !alienPort.equals("80")  &
-                     !alienPort.equals("443") & 
-                     !alienPort.equals("53") & // Avoid common ports
+                  => !hPortScanExceptionPorts.contains(alienPort)  & // Avoid common ports
+                     (   !isMyIP(alienIP, myNets) ||
+                         !hPortScanExceptionInternalPorts.contains(alienPort) ) &
                      numberPkts < 5 // few pkts per flow
            })
     .map({
@@ -2486,7 +2486,8 @@ object HogSFlow {
     sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
                   => !isMyIP(alienIP, myNets) &
-                     !ddosExceptionAlienPorts.contains(alienPort)
+                     !ddosExceptionAlienPorts.contains(alienPort) &
+                     direction < 1
            })
     .map({
       case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
@@ -2515,7 +2516,6 @@ object HogSFlow {
         numberOfflows > ddosMinConnectionsThreshold &
         !p2pTalkers.contains(myIP) &// Avoid P2P talkers
         {
-          
           val orderedFlowSet=
           flowSet
           .map({case (myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status) => beginTime})
