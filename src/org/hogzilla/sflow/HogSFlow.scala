@@ -46,6 +46,7 @@ import org.hogzilla.histogram.HogHistogram
 import org.hogzilla.util.HogFlow
 import org.apache.commons.math3.analysis.function.Min
 import org.hogzilla.hbase.HogHBaseInventory
+import scala.collection.mutable.TreeSet
 
 
 /**
@@ -2579,14 +2580,25 @@ object HogSFlow {
   
   
  
-  
+   
    /*
    * 
    *  C&C BotNets
-   * 
-   */
+   *
+   */  
+  object ccBotNets  {
+    val _set = new scala.collection.mutable.TreeSet[String]
+    HogHBaseReputation.getReputationList("CCBotNet", "blacklist")
+    .foreach({botnetIP => _set.add(botnetIP)})
+    
+      def findMatches(prefix: String): Iterable[String] =
+          _set from prefix takeWhile(_ startsWith prefix)
+    
+      def contains(prefix:String):Boolean =
+           this.findMatches(prefix).take(1).size>0
   
-   val ccBotNets = HogHBaseReputation.getReputationList("CCBotNet", "blacklist")
+  }
+   
    
   println("")
   println("C&C BotNets")
@@ -2595,7 +2607,7 @@ object HogSFlow {
   sflowSummary
   .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
                   =>  myPort.toLong > 1023 &
-                      ccBotNets.contains(alienIP) // TODO: Implement a fast approach for this
+                      ccBotNets.contains(alienIP)
            })
     .map({
           case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
