@@ -103,6 +103,7 @@ object HogSFlow {
   val ddosMinConnectionsThreshold = 50 // Over this, can be considered
   val ddosMinPairsThreshold = 20
   val ddosExceptionAlienPorts:Set[String] = Set("80","443","587","465","993","995")
+  val FlowListLimit = 1000
   
   
   /**
@@ -572,6 +573,7 @@ object HogSFlow {
   {
      flowSet.toList.sortBy({case (srcIP1,srcPort1,dstIP1,dstPort1,proto1,bytesUP,bytesDOWN,numberPkts1,direction1,beginTime,endTime,sampleRate,status) =>  bytesUP+bytesDOWN })
             .reverse
+            .take(FlowListLimit)
             ./:("")({ case (c,(srcIP1,srcPort1,dstIP1,dstPort1,proto1,bytesUP,bytesDOWN,numberPkts1,direction1,beginTime,endTime,sampleRate,status)) 
                         => 
                           val statusInd = { if(status>0) "[!]" else ""}
@@ -600,6 +602,7 @@ object HogSFlow {
                         bytesUP+bytesDOWN 
              })
       .reverse 
+      .take(FlowListLimit)
       ./:("")({ case (c,(srcIP1,icmpType,dstIP1,icmpCode,proto1,bytesUP,bytesDOWN,numberPkts1,direction1,beginTime,endTime,sampleRate,status)) 
                      => 
                      if(direction1>0)
