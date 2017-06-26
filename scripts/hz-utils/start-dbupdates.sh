@@ -7,12 +7,12 @@ cd $BIN
 (
 while : ; do
     $BIN/genCnCList.sh > /tmp/cclist.temp
-    php $BIN/updateReputationList.php -t blacklist -n CCBotNet -f /tmp/cclist.temp
-    rm /tmp/cclist.temp
+    php $BIN/updateReputationList.php -t blacklist -n CCBotNet -f /tmp/cclist.temp &>/dev/null
+    rm -f /tmp/cclist.temp
     
     for os in windows linux freebsd android apple ; do
       $BIN/getReposList.sh $os > /tmp/$os.txt
-      php $BIN/updateReputationList.php -t $os -n OSRepo -f /tmp/$os.txt
+      php $BIN/updateReputationList.php -t $os -n OSRepo -f /tmp/$os.txt &>/dev/null
       rm -f /tmp/$os.txt
     done
 

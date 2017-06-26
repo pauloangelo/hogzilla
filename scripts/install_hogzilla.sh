@@ -408,6 +408,7 @@ cmd "echo \"create 'hogzilla_histograms','info','values'\"                >> /tm
 cmd "echo \"create 'hogzilla_clusters','info'\"                           >> /tmp/.hogzilla_hbase_script"
 cmd "echo \"create 'hogzilla_cluster_members','info','member','cluster'\" >> /tmp/.hogzilla_hbase_script"
 cmd "echo \"create 'hogzilla_inventory','info'\"                          >> /tmp/.hogzilla_hbase_script"
+cmd "echo \"create 'hogzilla_authrecords','auth'\"                        >> /tmp/.hogzilla_hbase_script"
 
 for net in `echo $NETPREFIXES | sed 's/,/ /g'` ; do 
    cmd "echo \"put 'hogzilla_mynets', '$net', 'net:description', 'Desc $net'\"   >> /tmp/.hogzilla_hbase_script"
