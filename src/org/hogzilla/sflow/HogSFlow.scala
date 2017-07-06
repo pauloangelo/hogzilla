@@ -47,6 +47,8 @@ import org.hogzilla.util.HogFlow
 import org.apache.commons.math3.analysis.function.Min
 import org.hogzilla.hbase.HogHBaseInventory
 import scala.collection.mutable.TreeSet
+import com.typesafe.config.ConfigFactory
+import java.io.File
 
 
 /**
@@ -72,38 +74,85 @@ object HogSFlow {
                    HogSignature(3,"HZ: Vertical portscan",                     2,1,826001015,826).saveHBase(),//15
                    HogSignature(3,"HZ: Server under DDoS attack",              1,1,826001016,826).saveHBase(),//16
                    HogSignature(3,"HZ: C&C BotNet communication",              1,1,826001017,826).saveHBase())//17
+
+    val alienThreshold = 20
+    val topTalkersThreshold:Long = 21474836480L // (20*1024*1024*1024 = 20G)
+    val SMTPTalkersThreshold:Long = 20971520L // (20*1024*1024 = 20M)
+    val atypicalTCPPort:Set[String] = Set("80","443","587","465","993","995")
+    val atypicalPairsThresholdMIN = 300
+    val atypicalAmountDataThresholdMIN = 5737418240L // (10*1024*1024*1024 = 5G) 
+    val p2pPairsThreshold = 5
+    val p2pMyPortsThreshold = 4
+    val abusedSMTPBytesThreshold = 50000000L // ~50 MB
+    val p2pBytes2ndMethodThreshold = 10000000L // ~10 MB
+    val p2pPairs2ndMethodThreshold = 10
+    val p2pDistinctPorts2ndMethodThreshold = 10
+    val mediaClientCommunicationDurationThreshold = 300 // 5min (300s)
+    val mediaClientCommunicationDurationMAXThreshold = 7200 // 2h
+    val mediaClientPairsThreshold = p2pPairs2ndMethodThreshold
+    val mediaClientUploadThreshold = 10000000L // ~10MB
+    //val mediaClientDownloadThreshold = 10000000L // ~10MB
+    val mediaClientDownloadThreshold = 1000000L // 1MB
+    val dnsTunnelThreshold = 50000000L // ~50 MB
+    val bigProviderThreshold = 1073741824L // (1*1024*1024*1024 = 1G)
+    val icmpTunnelThreshold = 200 // 200b
+    val icmpTotalTunnelThreshold = 100000000L // ~100MB
+    val hPortScanMinFlowsThreshold = 100
+    val hPortScanExceptionPorts = Set("80","443","53")
+    val hPortScanExceptionInternalPorts = Set("123")
+    val vPortScanMinPortsThreshold = 3
+    val vPortScanPortIntervalThreshold = 1024 // 1 to 1023
+    val ddosMinConnectionsThreshold = 50 // Over this, can be considered
+    val ddosMinPairsThreshold = 20
+    val ddosExceptionAlienPorts:Set[String] = Set("80","443","587","465","993","995")
+    val FlowListLimit = 1000
+    val CCminPktsPerFlow = 2
+    val AtypicalTCPMinPkts = 2
+    val AtypicalAlienTCPMinPkts = 2
   
-  val alienThreshold = 20
-  val topTalkersThreshold:Long = 21474836480L // (20*1024*1024*1024 = 20G)
-  val SMTPTalkersThreshold:Long = 20971520L // (20*1024*1024 = 20M)
-  val atypicalTCPPort:Set[String] = Set("80","443","587","465","993","995")
-  val atypicalPairsThresholdMIN = 300
-  val atypicalAmountDataThresholdMIN = 5737418240L // (10*1024*1024*1024 = 5G) 
-  val p2pPairsThreshold = 5
-  val p2pMyPortsThreshold = 4
-  val abusedSMTPBytesThreshold = 50000000L // ~50 MB
-  val p2pBytes2ndMethodThreshold = 10000000L // ~10 MB
-  val p2pPairs2ndMethodThreshold = 10
-  val p2pDistinctPorts2ndMethodThreshold = 10
-  val mediaClientCommunicationDurationThreshold = 300 // 5min (300s)
-  val mediaClientCommunicationDurationMAXThreshold = 7200 // 2h
-  val mediaClientPairsThreshold = p2pPairs2ndMethodThreshold
-  val mediaClientUploadThreshold = 10000000L // ~10MB
-  //val mediaClientDownloadThreshold = 10000000L // ~10MB
-  val mediaClientDownloadThreshold = 1000000L // 1MB
-  val dnsTunnelThreshold = 50000000L // ~50 MB
-  val bigProviderThreshold = 1073741824L // (1*1024*1024*1024 = 1G)
-  val icmpTunnelThreshold = 200 // 200b
-  val icmpTotalTunnelThreshold = 100000000L // ~100MB
-  val hPortScanMinFlowsThreshold = 100
-  val hPortScanExceptionPorts = Set("80","443","53")
-  val hPortScanExceptionInternalPorts = Set("123")
-  val vPortScanMinPortsThreshold = 3
-  val vPortScanPortIntervalThreshold = 1024 // 1 to 1023
-  val ddosMinConnectionsThreshold = 50 // Over this, can be considered
-  val ddosMinPairsThreshold = 20
-  val ddosExceptionAlienPorts:Set[String] = Set("80","443","587","465","993","995")
-  val FlowListLimit = 1000
+ try {
+      val config = ConfigFactory.parseFile(new File("/home/hogzilla/hogzilla_config/sflow.conf"))
+      
+	     val alienThreshold              = config.getString("alienThreshold").toInt
+			 val topTalkersThreshold:Long    = config.getString("topTalkersThreshold").toLong // (20*1024*1024*1024 = 20G)
+			 val SMTPTalkersThreshold:Long   = config.getString("SMTPTalkersThreshold").toLong // (20*1024*1024 = 20M)
+			 // TODO: String to Set
+       val atypicalTCPPort:Set[String] = Set("80","443","587","465","993","995")
+       
+			 val atypicalPairsThresholdMIN        = config.getString("atypicalPairsThresholdMIN").toInt
+			 val atypicalAmountDataThresholdMIN   = config.getString("atypicalAmountDataThresholdMIN").toLong // (10*1024*1024*1024 = 5G) 
+			 val p2pPairsThreshold                = config.getString("p2pPairsThreshold").toInt
+			 val p2pMyPortsThreshold              = config.getString("p2pMyPortsThreshold").toInt
+			 val abusedSMTPBytesThreshold         = config.getString("abusedSMTPBytesThreshold").toLong // ~50 MB
+			 val p2pBytes2ndMethodThreshold       = config.getString("p2pBytes2ndMethodThreshold").toLong // ~10 MB
+			 val p2pPairs2ndMethodThreshold       = config.getString("p2pPairs2ndMethodThreshold").toInt
+			 val p2pDistinctPorts2ndMethodThreshold           = config.getString("p2pDistinctPorts2ndMethodThreshold").toInt
+			 val mediaClientCommunicationDurationThreshold    = config.getString("mediaClientCommunicationDurationThreshold").toInt // 5min (300s)
+			 val mediaClientCommunicationDurationMAXThreshold = config.getString("mediaClientCommunicationDurationMAXThreshold").toInt // 2h
+			 val mediaClientPairsThreshold                    = p2pPairs2ndMethodThreshold
+			 val mediaClientUploadThreshold         = config.getString("mediaClientUploadThreshold").toLong // ~10MB
+			 //val mediaClientDownloadThreshold = 10000000L // ~10MB
+			 val mediaClientDownloadThreshold       = config.getString("mediaClientDownloadThreshold").toLong // 1MB
+			 val dnsTunnelThreshold                 = config.getString("dnsTunnelThreshold").toLong // ~50 MB
+			 val bigProviderThreshold               = config.getString("bigProviderThreshold").toLong // (1*1024*1024*1024 = 1G)
+			 val icmpTunnelThreshold                = config.getString("icmpTunnelThreshold").toInt // 200b
+			 val icmpTotalTunnelThreshold           = config.getString("icmpTotalTunnelThreshold").toLong // ~100MB
+			 val hPortScanMinFlowsThreshold         = config.getString("hPortScanMinFlowsThreshold").toInt
+			 val hPortScanExceptionPorts            = Set("80","443","53")
+			 val hPortScanExceptionInternalPorts    = Set("123")
+			 val vPortScanMinPortsThreshold         = config.getString("vPortScanMinPortsThreshold").toInt
+			 val vPortScanPortIntervalThreshold     = config.getString("vPortScanPortIntervalThreshold").toInt // 1 to 1023
+			 val ddosMinConnectionsThreshold        = config.getString("ddosMinConnectionsThreshold").toInt // Over this, can be considered
+			 val ddosMinPairsThreshold              = config.getString("ddosMinPairsThreshold").toInt
+			 val ddosExceptionAlienPorts:Set[String] = Set("80","443","587","465","993","995")
+			 val FlowListLimit                      = config.getString("FlowListLimit").toInt
+       val CCminPktsPerFlow                   = config.getString("CCminPktsPerFlow").toInt
+       val AtypicalTCPMinPkts                 = config.getString("AtypicalTCPMinPkts").toInt
+       val AtypicalAlienTCPMinPkts            = config.getString("AtypicalAlienTCPMinPkts").toInt
+     } catch {
+        case t: Throwable => // t.printStackTrace() 
+        println("Problem reading configuration file '/home/hogzilla/hogzilla_config/sflow.conf'. Using default options.")
+     }  
   
   
   /**
@@ -316,6 +365,8 @@ object HogSFlow {
     val bytesDown:String = event.data.get("bytesDown")
     val numberPkts:String = event.data.get("numberPkts")
     val stringFlows:String = event.data.get("stringFlows")
+    
+    event.title = "HZ: P2P communication"
 
     
     event.text = "This IP was detected by Hogzilla performing an abnormal activity. In what follows, you can see more information.\n"+
@@ -563,6 +614,7 @@ object HogSFlow {
                   "Bytes Down: "+humanBytes(bytesDown)+"\n"+
                   "Packets: "+numberPkts+"\n"+
                   "Connections: "+connections+"\n"+
+                  "VirusTotal ref.: https://www.virustotal.com/en/ip-address/"+hostname+"/information/"
                   "Flows"+stringFlows
                   
     event.signature_id = signature._17.signature_id       
@@ -1272,7 +1324,7 @@ object HogSFlow {
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
                   =>  //direction  < 0 & // Algorithm implemented below to dig this information in another interesting form
                       !ftpTalkers.contains((myIP,alienIP)) &
-                      //( numberPkts > 1  ) & XXX: Test 
+                      numberPkts >= AtypicalTCPMinPkts  &  
                       //bytesUp > 0 &
                       //bytesDown > 0 &
                       status > 0 // PSH-ACK or SYN-ACK flags or ACK from MyHost 
@@ -1433,7 +1485,7 @@ object HogSFlow {
                                                   Map[String,Double],Long,Long)] = 
     sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
-                  =>  //numberPkts > 1           & //XXX: Test
+                  =>  numberPkts >= AtypicalAlienTCPMinPkts     & 
                       alienPort.toLong < 10000 &
                       direction > -1           &
                       myPort.toLong > 1024     &
@@ -2610,6 +2662,7 @@ object HogSFlow {
   sflowSummary
   .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
                   =>  myPort.toLong > 1023 &
+                      numberPkts.toLong >= CCminPktsPerFlow &
                       ccBotNets.contains(alienIP)
            })
     .map({

@@ -19,9 +19,9 @@
 #
 
 # Variables
-HADOOP_VERSION="2.7.3"
-HBASE_VERSION="1.2.3"
-SPARK_VERSION="2.0.1"
+HADOOP_VERSION="2.6.5"
+HBASE_VERSION="1.2.6"
+SPARK_VERSION="1.6.3"
 SFLOWTOOL_VERSION="3.39"
 TMP_FILE="/tmp/.hzinstallation.temp"
 HZURL="http://ids-hogzilla.org"
@@ -69,6 +69,7 @@ PRE-REQUISITES:\n
    - > 8G RAM
    - > 50G HD
    - > 1 CPU 
+   - Hostname must resolve to an Interface IP!
    \n
 You will be requested to inform:\n
    - GrayLog Server IP\n
@@ -210,8 +211,8 @@ if [ $? -gt 0 ] ; then
                   "deb-src WebUpd8Team already in /etc/apt/sources.list"
     cmd "apt-key adv --keyserver keyserver.ubuntu.com --recv-keys EEA14886"
     apt-get update
-    apt-get install -y oracle-java8-installer
-    apt-get install -y oracle-java8-set-default
+    apt-get install --force-yes oracle-java8-installer
+    apt-get install --force-yes oracle-java8-set-default
     
     java -XshowSettings:properties -version 2>&1 | grep java.vendor | grep Oracle > /dev/null
     if [ $? -eq 0 ] ;then
@@ -243,12 +244,12 @@ cmd_su "hogzilla" "tar xzf /home/hogzilla/app/hbase-$HBASE_VERSION-bin.tar.gz -C
 directory_exists "/home/hogzilla/hbase" && cmd "rm -rf /home/hogzilla/hbase"
 directory_exists "/home/hogzilla/hbase-$HBASE_VERSION" && cmd_su "hogzilla" "mv /home/hogzilla/hbase-$HBASE_VERSION /home/hogzilla/hbase"
 
-cmd_su "hogzilla" "wget -c -O /home/hogzilla/app/spark-$SPARK_VERSION-bin-hadoop2.7.tgz 'http://mirror.nbtelecom.com.br/apache/spark/spark-$SPARK_VERSION/spark-$SPARK_VERSION-bin-hadoop2.7.tgz'"
-file_exists "/home/hogzilla/app/spark-$SPARK_VERSION-bin-hadoop2.7.tgz" || die 1 "Coult not download spark-$SPARK_VERSION-bin-hadoop2.7.tgz"
-cmd_su "hogzilla" "tar xzf /home/hogzilla/app/spark-$SPARK_VERSION-bin-hadoop2.7.tgz -C /home/hogzilla/"
-cmd "chown -R hogzilla. /home/hogzilla/spark-$SPARK_VERSION-bin-hadoop2.7"
+cmd_su "hogzilla" "wget -c -O /home/hogzilla/app/spark-$SPARK_VERSION-bin-hadoop2.6.tgz 'http://mirror.nbtelecom.com.br/apache/spark/spark-$SPARK_VERSION/spark-$SPARK_VERSION-bin-hadoop2.6.tgz'"
+file_exists "/home/hogzilla/app/spark-$SPARK_VERSION-bin-hadoop2.6.tgz" || die 1 "Coult not download spark-$SPARK_VERSION-bin-hadoop2.6.tgz"
+cmd_su "hogzilla" "tar xzf /home/hogzilla/app/spark-$SPARK_VERSION-bin-hadoop2.6.tgz -C /home/hogzilla/"
+cmd "chown -R hogzilla. /home/hogzilla/spark-$SPARK_VERSION-bin-hadoop2.6"
 directory_exists "/home/hogzilla/spark" && cmd "rm -rf /home/hogzilla/spark"
-directory_exists "/home/hogzilla/spark-$SPARK_VERSION-bin-hadoop2.7" && cmd_su "hogzilla" "mv /home/hogzilla/spark-$SPARK_VERSION-bin-hadoop2.7 /home/hogzilla/spark"
+directory_exists "/home/hogzilla/spark-$SPARK_VERSION-bin-hadoop2.6" && cmd_su "hogzilla" "mv /home/hogzilla/spark-$SPARK_VERSION-bin-hadoop2.6 /home/hogzilla/spark"
 
 grep "HADOOP_CONF_DIR" /home/hogzilla/.bashrc > /dev/null
 if [ $? -gt 0 ] ; then
@@ -458,7 +459,7 @@ cmd_su "hogzilla" "tar xzf /home/hogzilla/app/pigtail-v1.1-latest.tar.gz -C /hom
 directory_exists "/usr/share/php/Thrift/Packages/" || cmd "mkdir /usr/share/php/Thrift/Packages/"
 directory_exists "/home/hogzilla/pigtail/gen-php/Hbase/" && cmd "cp -a /home/hogzilla/pigtail/gen-php/Hbase/ /usr/share/php/Thrift/Packages/"
 
-file_exists "/home/hogzilla/pigtail/pigtail.php" && sed -i.original /home/hogzilla/pigtail/pigtail.php -e 's#grayloghost#$GRAYLOGHOST#'
+file_exists "/home/hogzilla/pigtail/pigtail.php" && sed -i.original /home/hogzilla/pigtail/pigtail.php -e "s#grayloghost#$GRAYLOGHOST#"
 
 # Hogzilla utils
 cmd_su "hogzilla" "wget -c -O /home/hogzilla/app/hz-utils-v1.0-latest.tar.gz '$HZURL/downloads/hz-utils-v1.0-latest.tar.gz'"
@@ -478,6 +479,7 @@ su hogzilla -c "cd /home/hogzilla/sflowtool-$SFLOWTOOL_VERSION ; make"
 cd /home/hogzilla/sflowtool-$SFLOWTOOL_VERSION ; make install
 
 msg_notice "I'm going to start sFlow collector, Hogzilla processing, DBUpdates and PigTail."
+chmod 755 /home/hogzilla/bin/*
 su - hogzilla -c "/home/hogzilla/bin/start-pigtail.sh"
 su - hogzilla -c "/home/hogzilla/bin/start-hogzilla.sh"
 su - hogzilla -c "/home/hogzilla/bin/start-sflow2hz.sh"

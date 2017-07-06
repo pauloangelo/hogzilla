@@ -50,6 +50,9 @@ import org.apache.spark.mllib.linalg.Vector
 import org.apache.spark.mllib.clustering.KMeans
 import org.hogzilla.hbase.HogHBaseCluster
 import org.hogzilla.cluster.HogClusterMember
+import org.hogzilla.util.HogStringUtils
+import org.hogzilla.util.HogFlow
+import org.hogzilla.util.HogFlow
 
 
 /**
@@ -88,8 +91,7 @@ object HogAuth {
   
    
   def populateAtypicalAccessLocation(event:HogEvent):HogEvent =
-  {
-                
+  {           
     val userName:String = event.data.get("userName")
     val atypicalCities:String = event.data.get("atypicalCities")
     val accessLogs:String = event.data.get("accessLogs")
@@ -102,6 +104,40 @@ object HogAuth {
                   "Atypical access logs:\n"+accessLogs
                   
     event.signature_id = signature._1.signature_id       
+    event
+  }
+  
+  def populateAtypicalAccessUserAgent(event:HogEvent):HogEvent =
+  {           
+    val userName:String = event.data.get("userName")
+    val atypicalUserAgents:String = event.data.get("atypicalUserAgents")
+    val accessLogs:String = event.data.get("accessLogs")
+    
+    event.title = f"HZ/Auth: Atypical access location ($atypicalUserAgents)"
+    
+    event.text =  "The user accessed using UserAgents which are not usual for his profile.\n"+
+                  "Username: "+userName+"\n"+
+                  "Atypical UserAgents: "+atypicalUserAgents+"\n"+
+                  "Atypical access logs:\n"+accessLogs
+                  
+    event.signature_id = signature._2.signature_id       
+    event
+  }
+  
+  def populateAtypicalAccessService(event:HogEvent):HogEvent =
+  {           
+    val userName:String = event.data.get("userName")
+    val atypicalServices:String = event.data.get("atypicalServices")
+    val accessLogs:String = event.data.get("accessLogs")
+    
+    event.title = f"HZ/Auth: Atypical access location ($atypicalServices)"
+    
+    event.text =  "The user accessed services which are not usual for his profile.\n"+
+                  "Username: "+userName+"\n"+
+                  "Atypical Services: "+atypicalServices+"\n"+
+                  "Atypical access logs:\n"+accessLogs
+                  
+    event.signature_id = signature._3.signature_id       
     event
   }
   
@@ -122,6 +158,7 @@ object HogAuth {
 			  c+"\n"+clientIP+"("+clientReverse+") => "+agent+":"+service+"  [Location: "+city+"/"+region+"/"+country+", UA: "+userAgent+", AuthMethod: "+authMethod+", ASN: "+asn+" "+loginFailedString+"]"
 		  })
 	  }
+  
 
   
   /**
@@ -189,43 +226,107 @@ object HogAuth {
     .values
     .foreach{ case (userName,hashSet) => 
       
-      val cities1:Map[String,Double] = 
-        collection.mutable.Map() ++
-        hashSet.groupBy({case tuple => (tuple._9,tuple._11)})
-               .map({case (a,b) => (b.head._11.replace(" ", "_").trim()+"/"+b.head._9.replace(" ", "_").trim(), b.map(a => 1D).sum )}).toMap
+        // Atypical Cities
+        val cities1:Map[String,Double] = 
+              collection.mutable.Map() ++
+              hashSet.groupBy({case tuple => (tuple._9,tuple._11)})
+                     .map({case (a,b) => (b.head._11.replace(" ", "_").trim()+"/"+b.head._9.replace(" ", "_").trim(), b.map(a => 1D).sum )}).toMap
         val totalCities = cities1.map(_._2).sum.toLong
         val citiesHistogram:Map[String,Double] = cities1.map({case (city,count) => (city,count/totalCities)})
+        val citiesSavedHistogram=HogHBaseHistogram.getHistogram("HIST20-"+userName)
+        
+        // Atypical UserAgents
+        val userAgents1:Map[String,Double] = 
+              collection.mutable.Map() ++
+              hashSet.groupBy({case tuple => tuple._8})
+                     .map({case (a,b) => (HogStringUtils.md5(b.head._8.trim()), b.map(a => 1D).sum )}).toMap
+        val totalUserAgents = userAgents1.map(_._2).sum.toLong
+        val userAgentHistogram:Map[String,Double] = userAgents1.map({case (ua,count) => (ua,count/totalUserAgents)})
+        val userAgentSavedHistogram=HogHBaseHistogram.getHistogram("HIST21-"+userName)
+        
+        // Atypical Server/Service
+        val services1:Map[String,Double] = 
+              collection.mutable.Map() ++
+              hashSet.groupBy({case tuple => (tuple._2,tuple._3)})
+                     .map({case (a,b) => (b.head._2.replace(" ", "_").trim()+"/"+b.head._3.replace(" ", "_").trim(), b.map(a => 1D).sum )}).toMap
+        val totalServices = services1.map(_._2).sum.toLong
+        val servicesHistogram:Map[String,Double] = services1.map({case (service,count) => (service,count/totalServices)})
+        val servicesSavedHistogram=HogHBaseHistogram.getHistogram("HIST22-"+userName)
       
-        val savedHistogram=HogHBaseHistogram.getHistogram("HIST20-"+userName)
+        
+        // Atypical Cities
+        if(citiesSavedHistogram.histSize< 10){
+        	HogHBaseHistogram.saveHistogram(Histograms.merge(citiesSavedHistogram, new HogHistogram("",totalCities,citiesHistogram)))
+        }else{
+        	    val atypicalCities   = Histograms.atypical(citiesSavedHistogram.histMap, citiesHistogram)
 
-        if(savedHistogram.histSize< 10)
-        {
-        	HogHBaseHistogram.saveHistogram(Histograms.merge(savedHistogram, new HogHistogram("",totalCities,citiesHistogram)))
-        }else
-        {
-        	    val atypical   = Histograms.atypical(savedHistogram.histMap, citiesHistogram)
-
-        			if(atypical.size>0 & savedHistogram.histMap.filter({case (key,value) => value > 0.001D}).size <5)
+        			if(atypicalCities.size>0 & citiesSavedHistogram.histMap.filter({case (key,value) => value > 0.001D}).size <5)
         			{
-        				val atypicalAccess = hashSet.filter({case tuple => atypical.contains(tuple._11.replace(" ", "_").trim())})
+        				val atypicalAccess = hashSet.filter({case tuple => atypicalCities.contains(tuple._11.replace(" ", "_").trim()+"/"+tuple._9.replace(" ", "_").trim())})
                 
-                println("UserName: "+userName+ " - Atypical access location: "+atypical.toString)
+                println("UserName: "+userName+ " - Atypical access location: "+atypicalCities.toString)
 
         				val flowMap: Map[String,String] = new HashMap[String,String]
-        						flowMap.put("flow:id",System.currentTimeMillis.toString)
-        						val event = new HogEvent(new HogFlow(flowMap,hashSet.head._5,hashSet.head._2))
-                
+        				flowMap.put("flow:id",System.currentTimeMillis.toString)
+        				val event = new HogEvent(new HogFlow(flowMap,hashSet.head._5,hashSet.head._2))
                              
-                                
                 event.data.put("userName", userName) 
-                event.data.put("atypicalCities", atypical.toString)          
-        				event.data.put("accessLogs",authTupleToString(hashSet))
+                event.data.put("atypicalCities", atypicalCities.toString)          
+        				event.data.put("accessLogs",authTupleToString(atypicalAccess))
         				
-
         				populateAtypicalAccessLocation(event).alert()
         			}
+              HogHBaseHistogram.saveHistogram(Histograms.merge(citiesSavedHistogram, new HogHistogram("",totalCities,citiesHistogram)))
+        }
+        
+        // Atypical UserAgents
+        if(userAgentSavedHistogram.histSize< 10){
+          HogHBaseHistogram.saveHistogram(Histograms.merge(userAgentSavedHistogram, new HogHistogram("",totalUserAgents,userAgentHistogram)))
+        }else{
+              val atypicalUserAgents   = Histograms.atypical(userAgentSavedHistogram.histMap, userAgentHistogram)
 
-          HogHBaseHistogram.saveHistogram(Histograms.merge(savedHistogram, new HogHistogram("",totalCities,citiesHistogram)))
+              if(atypicalUserAgents.size>0 & userAgentSavedHistogram.histMap.filter({case (key,value) => value > 0.001D}).size <5)
+              {
+                val atypicalAccess = hashSet.filter({case tuple => atypicalUserAgents.contains(HogStringUtils.md5(tuple._8.trim()))})
+                
+                println("UserName: "+userName+ " - Atypical access UserAgent: "+atypicalUserAgents.toString)
+
+                val flowMap: Map[String,String] = new HashMap[String,String]
+                flowMap.put("flow:id",System.currentTimeMillis.toString)
+                val event = new HogEvent(new HogFlow(flowMap,hashSet.head._5,hashSet.head._2))
+                             
+                event.data.put("userName", userName) 
+                event.data.put("atypicalUserAgents", atypicalUserAgents.toString)          
+                event.data.put("accessLogs",authTupleToString(atypicalAccess))
+                
+                populateAtypicalAccessUserAgent(event).alert()
+              }
+              HogHBaseHistogram.saveHistogram(Histograms.merge(userAgentSavedHistogram, new HogHistogram("",totalUserAgents,userAgentHistogram)))
+        }
+        
+        // Atypical Server/Service
+        if(servicesSavedHistogram.histSize< 10){
+          HogHBaseHistogram.saveHistogram(Histograms.merge(servicesSavedHistogram, new HogHistogram("",totalServices,servicesHistogram)))
+        }else{
+              val atypicalServices   = Histograms.atypical(servicesSavedHistogram.histMap, servicesHistogram)
+
+              if(atypicalServices.size>0 & servicesSavedHistogram.histMap.filter({case (key,value) => value > 0.001D}).size <5)
+              {
+                val atypicalAccess = hashSet.filter({case tuple => atypicalServices.contains(tuple._2.replace(" ", "_").trim()+"/"+tuple._3.replace(" ", "_").trim())})
+                
+                println("UserName: "+userName+ " - Atypical access services: "+atypicalServices.toString)
+
+                val flowMap: Map[String,String] = new HashMap[String,String]
+                flowMap.put("flow:id",System.currentTimeMillis.toString)
+                val event = new HogEvent(new HogFlow(flowMap,hashSet.head._5,hashSet.head._2))
+                             
+                event.data.put("userName", userName) 
+                event.data.put("atypicalServices", atypicalServices.toString)          
+                event.data.put("accessLogs",authTupleToString(atypicalAccess))
+                
+                populateAtypicalAccessService(event).alert()
+              }
+              HogHBaseHistogram.saveHistogram(Histograms.merge(servicesSavedHistogram, new HogHistogram("",totalServices,servicesHistogram)))
         }
 
   }

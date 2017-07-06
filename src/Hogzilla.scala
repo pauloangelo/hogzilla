@@ -24,6 +24,7 @@ import org.hogzilla.initiate.HogInitiate
 import org.hogzilla.prepare.HogPrepare
 import org.hogzilla.sflow._
 import org.hogzilla.http.HogHTTP
+import org.hogzilla.auth.HogAuth
 import org.hogzilla.dns.HogDNS
 
 /**
@@ -70,6 +71,10 @@ object Hogzilla {
      
     val HogRDDHistograms = HogHBaseRDD.connectHistograms(spark);
     HogSFlowHistograms.run(HogRDDHistograms,spark);
+    
+     
+    val HogRDDAuth = HogHBaseRDD.connectAuth(spark);
+    HogAuth.run(HogRDDAuth,spark);
      
     
     // Stop Spark

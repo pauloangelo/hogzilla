@@ -42,6 +42,7 @@ object HogPrepare {
     println("Cleaning HBase...")
     cleanFlows(HogRDD)
     cleanSFlows(HogRDD)
+    cleanAuthRecords(HogRDD)
   }
   
   def cleanFlows(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)])
@@ -241,6 +242,57 @@ object HogPrepare {
       while(scanner.hasNext())
       {
         HogHBaseRDD.hogzilla_sflows.delete(new Delete(scanner.next().getRow))
+        counter+=1
+      }
+      
+      counter
+    }).reduce( (a,b) => a+b)
+    
+    println("Old rows dropped: "+totalOld)
+        
+
+  }
+  
+  
+  
+  
+  
+  def cleanAuthRecords(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)])
+  {
+  
+    
+    
+    // Delete old data from HBase 86400 is one day. You should need even more, depends on your available resources.
+    
+    println("Cleaning hogzilla_authrecords...")
+    val now = System.currentTimeMillis
+    
+    val timeUnit:Long = 21600000 /* maybe one day (86400000) or half (43200000) or quarter (21600000) */
+    val timeSuperior1 = now - timeUnit
+    val nSplits = 5 /* number of parallel tasks */
+    val denseTime = timeUnit*1
+    val deltaT1 = denseTime/nSplits
+    //val deltaT2 = (timeSuperior2-timeSuperior1)/nSplits
+ 
+    println("Removing all older than "+timeSuperior1)
+    val totalOld = (0 to nSplits).toList.par.map({ k => 
+       
+      val scan = new Scan
+      
+      if(k.equals(0))
+        scan.setTimeRange(0, timeSuperior1-denseTime)
+      else
+        scan.setTimeRange(timeSuperior1-denseTime + deltaT1*(k-1), timeSuperior1-denseTime + deltaT1*k)
+        
+      
+      println("TimeRange: "+scan.getTimeRange.toString())  
+    
+      val scanner = HogHBaseRDD.hogzilla_authrecords.getScanner(scan).iterator()
+    
+      var counter=0;
+      while(scanner.hasNext())
+      {
+        HogHBaseRDD.hogzilla_authrecords.delete(new Delete(scanner.next().getRow))
         counter+=1
       }
       

@@ -10,6 +10,7 @@ if [ $? -eq 0 ] ; then
    su - hogzilla -c "$HBASE_HOME/bin/start-hbase.sh"
    su - hogzilla -c "$HBASE_HOME/bin/hbase-daemon.sh start thrift"
    su - hogzilla -c "/home/hogzilla/bin/start-pigtail.sh"
+   su - hogzilla -c "/home/hogzilla/hadoop/bin/hdfs dfsadmin -safemode leave"
    su - hogzilla -c "/home/hogzilla/bin/start-hogzilla.sh"
    su - hogzilla -c "/home/hogzilla/bin/start-sflow2hz.sh"
    su - hogzilla -c "/home/hogzilla/bin/start-dbupdates.sh"
@@ -19,6 +20,7 @@ else
    $HBASE_HOME/bin/start-hbase.sh
    $HBASE_HOME/bin/hbase-daemon.sh start thrift
    /home/hogzilla/bin/start-pigtail.sh   
+   /home/hogzilla/hadoop/bin/hdfs dfsadmin -safemode leave
    /home/hogzilla/bin/start-hogzilla.sh  
    /home/hogzilla/bin/start-sflow2hz.sh 
    /home/hogzilla/bin/start-dbupdates.sh 

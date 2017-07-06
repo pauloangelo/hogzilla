@@ -112,20 +112,42 @@ object HogSFlowHistograms {
                                       val histogramName    = Bytes.toString(result.getValue(Bytes.toBytes("info"), Bytes.toBytes("name")))
                                       val histMap          = HogHBaseHistogram.mapByResult(result)
                                       
-                                      val keys:Set[Long] = histMap.filter({ case (key,value) => key.toDouble < 10000 & value>0.001})
+                                      val keys:Set[Long] = histMap.filter({ case (key,value) =>
+                                        
+                                                                              
+                                                                               try {
+                                                                                 histogramName.startsWith("HIST01") & key.toDouble < 10000 & value>0.001
+                                                                               } catch {
+                                                                                 case t: Throwable => // t.printStackTrace() // TODO: handle error
+                                                                                 histogramName.startsWith("HIST01") & value>0.001
+                                                                               }
+                                                                               
+                                                                           })
                                                            .keySet
-                                                           .map({ case key => key.toDouble.toLong })
+                                                           .map({ case key => 
+                                                             try {
+                                                               key.toDouble.toLong
+                                                             } catch {
+                                                               case t: Throwable => t.printStackTrace() // TODO: handle error
+                                                               0L
+                                                             }       
+                                                             
+                                                            })
                                                            .toSet
                                       //"HIST01-"+myIP
                                       
                                       (histogramName,histogramSize,keys,histMap)
                            })
                            .filter({case (histogramName,histogramSize,keys,histMap) =>
-                                         histogramName.startsWith("HIST01") &
                                          histogramSize>20 &
                                          isMyIP(histogramName.subSequence(histogramName.lastIndexOf("-")+1, histogramName.length()).toString,myNets)
                                    })
                            .cache
+
+  val summary1Count = summary1.count()
+  if(summary1Count.equals(0))
+    return
+    
                            
   val allKeys = summary1
                 .map(_._3)
