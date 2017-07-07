@@ -191,7 +191,14 @@ object HogAuth {
                                       val clientIP       = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("clientIP")))
                                       val userName       = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("userName")))
                                       val authMethod     = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("authMethod")))
-                                      val loginFailed    = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("loginFailed"))).toInt
+                                      var loginFailed1=0
+                                      try {
+                                        var loginFailed1    = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("loginFailed"))).toInt
+                                      } catch {
+                                        case t: Throwable =>// t.printStackTrace() // TODO: handle error
+                                      
+                                      }
+                                      val loginFailed=loginFailed1
                                       val userAgent      = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("userAgent")))
                                       val country        = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("country")))
                                       val region         = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("region")))
