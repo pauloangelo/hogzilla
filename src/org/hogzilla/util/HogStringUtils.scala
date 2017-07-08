@@ -20,8 +20,8 @@
 package org.hogzilla.util
 
 import java.security.MessageDigest
-
 import org.apache.hadoop.hbase.util.Bytes
+import javax.xml.bind.DatatypeConverter
 
 
 /**
@@ -31,6 +31,6 @@ object HogStringUtils {
   
   def md5(string:String):String =
   {
-    Bytes.toString(MessageDigest.getInstance("MD5").digest(string.getBytes))  
+    DatatypeConverter.printHexBinary(MessageDigest.getInstance("MD5").digest(string.getBytes))  
   }
 }
