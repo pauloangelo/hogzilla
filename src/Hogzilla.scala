@@ -50,7 +50,7 @@ object Hogzilla {
     // Initiate HogZilla
     HogInitiate.initiate(spark);
   
-   
+ 
     // Prepare the data
     HogPrepare.prepare(HogRDD)
     
@@ -72,7 +72,7 @@ object Hogzilla {
     val HogRDDHistograms = HogHBaseRDD.connectHistograms(spark);
     HogSFlowHistograms.run(HogRDDHistograms,spark);
     
-     
+    
     val HogRDDAuth = HogHBaseRDD.connectAuth(spark);
     HogAuth.run(HogRDDAuth,spark);
      

@@ -97,9 +97,9 @@ object Histograms {
   
    def merge(histogram1:HogHistogram,histogram2:HogHistogram):HogHistogram = 
   {
-        
-         
-    val keys = histogram1.histMap.keySet ++ histogram2.histMap.keySet
+          
+    val keys      = histogram1.histMap.keySet ++ histogram2.histMap.keySet
+    val keysLabel = histogram1.histLabels.keySet ++ histogram2.histLabels.keySet
     
     keys./:(0.0){ case (ac,key) =>
                   val p:Double = { if(histogram1.histMap.get(key).isEmpty) 0 else histogram1.histMap.get(key).get }
@@ -118,8 +118,15 @@ object Histograms {
                   0D
                 }
     
+    keysLabel./:(0.0){ case (ac,key) =>
+                        if(histogram1.histLabels.get(key).isEmpty)
+                           histogram1.histLabels.put(key,histogram2.histLabels.get(key).get)
+                          
+                        0D
+                     }
+    
     val total = histogram1.histSize+histogram2.histSize
-    new HogHistogram(histogram1.histName,total,histogram1.histMap)
+    new HogHistogram(histogram1.histName,total,histogram1.histMap,histogram1.histLabels)
   }
    
   // It is not exactly a histogram, but... 
@@ -128,6 +135,7 @@ object Histograms {
         
          
     val keys = histogram1.histMap.keySet ++ histogram2.histMap.keySet
+    val keysLabel = histogram1.histLabels.keySet ++ histogram2.histLabels.keySet
     
     keys./:(0.0){ case (ac,key) =>
                   val p:Double = { if(histogram1.histMap.get(key).isEmpty) 0 else histogram1.histMap.get(key).get }
@@ -140,8 +148,15 @@ object Histograms {
                   0D
                 }
     
+     keysLabel./:(0.0){ case (ac,key) =>
+                        if(histogram1.histLabels.get(key).isEmpty)
+                           histogram1.histLabels.put(key,histogram2.histLabels.get(key).get)
+                          
+                        0D
+                     }
+    
     val total = histogram1.histSize+histogram2.histSize
-    new HogHistogram(histogram1.histName,total,histogram1.histMap)
+    new HogHistogram(histogram1.histName,total,histogram1.histMap,histogram1.histLabels)
   }
   
    
@@ -170,7 +185,7 @@ object Histograms {
                 }
     
     val total = histogram1.histSize-histogram2.histSize
-    new HogHistogram(histogram1.histName,total,histogram1.histMap)
+    new HogHistogram(histogram1.histName,total,histogram1.histMap,histogram1.histLabels)
   }
   
   

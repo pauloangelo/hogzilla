@@ -41,11 +41,18 @@ class HogEvent(flow:HogFlow)
   
   def formatIPtoBytes(ip:String):Array[Byte] =
   {
-    // Eca! Snorby doesn't support IPv6 yet. See https://github.com/Snorby/snorby/issues/65
+    try {
+       // Eca! Snorby doesn't support IPv6 yet. See https://github.com/Snorby/snorby/issues/65
     if(ip.contains(":"))
       InetAddress.getByName("255.255.6.6").getAddress
     else  
       InetAddress.getByName(ip).getAddress
+    } catch {
+      case t: Throwable => 
+        // Bogus address!
+        InetAddress.getByName("255.255.1.1").getAddress
+    }   
+   
   }
 
   

@@ -25,11 +25,12 @@
 package org.hogzilla.auth
 
 import scala.collection.mutable.HashMap
+import org.uaparser.scala.Parser
+import org.uaparser.scala.Client
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.Map
 import scala.math.floor
 import scala.math.log
-
 import org.apache.hadoop.hbase.client.Scan
 import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.SparkContext
@@ -46,6 +47,7 @@ import org.hogzilla.histogram.HogHistogram
 import org.hogzilla.util.HogFlow
 import org.hogzilla.util.HogFlow
 import org.hogzilla.util.HogFlow
+import org.hogzilla.util.HogGeograph
 import org.hogzilla.util.HogStringUtils
 
 
@@ -59,7 +61,8 @@ object HogAuth {
                    HogSignature(3,"HZ/Auth: Atypical access user-agent" ,              2,1,826001202,826).saveHBase(), //2
                    HogSignature(3,"HZ/Auth: Atypical access system" ,                  2,1,826001203,826).saveHBase()) //3
                 
-  
+   // In KM, doesn't alert if the new location is near a typical location
+   val locationDistanceMinThreshold = 300
  
   /**
    * 
@@ -176,7 +179,8 @@ object HogAuth {
     
    val myNets:scala.collection.immutable.Set[String] = myNetsTemp.toSet
    
-   
+  
+  println("Mapping auth records...")                     
   val summary1: RDD[(Double,String,String,String,String,String,String,Int,String,String,String,String,String,String)] 
                       = HogRDD
                         .map ({  case (id,result) => 
@@ -195,8 +199,15 @@ object HogAuth {
                                         case t: Throwable =>// t.printStackTrace() // TODO: handle error
                                       
                                       }
+                                     
                                       val loginFailed=loginFailed1
                                       val userAgent      = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("userAgent")))
+                                      val clientUA       = { if (userAgent.length().equals(0)) "" else 
+                                                              { 
+                                                                 val client=Parser.default.parse(userAgent)
+                                                                 client.os.family+"/"+client.userAgent.family
+                                                              } 
+                                                            }
                                       val country        = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("country")))
                                       val region         = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("region")))
                                       val city           = Bytes.toString(new String(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("city")),"ISO-8859-1").getBytes("UTF-8"))
@@ -205,10 +216,10 @@ object HogAuth {
                                       val asn            = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("asn")))
                                       
                                       (generatedTime, agent, service, clientReverse, clientIP, userName, authMethod, 
-                                          loginFailed, userAgent, country, region, city, coords, asn)
+                                          loginFailed, clientUA, country, region, city, coords, asn)
                            }).cache
 
-                           
+  println("Counting auth records...")                         
   val summary1Count = summary1.count()
   if(summary1Count.equals(0))
     return
@@ -220,7 +231,7 @@ object HogAuth {
                 val authSet:HashSet[(Double,String,String,String,String,String,Int,String,String,String,String,String,String)] = new HashSet()  
                     authSet.add((generatedTime, agent, service, clientReverse, clientIP, authMethod, 
                                           loginFailed, userAgent, country, region, city, coords, asn))                     
-                                           
+                   
                 (userName, (userName,authSet))
         })
         .reduceByKey({  (a,b)=> (a._1,  a._2++b._2)    })
@@ -231,22 +242,24 @@ object HogAuth {
     .values
     .foreach{ case (userName,hashSet) => 
       
-       // println(f"Auth profile for user $userName")
+        println(f"Auth profile for user $userName")
       
         // Atypical Cities
-        val cities1:Map[String,Double] = 
+        val cities1:Map[String,(Double,String)] = 
               collection.mutable.Map() ++
-              hashSet.groupBy({case tuple => (tuple._9,tuple._11)})
-                     .map({case (a,b) => (b.head._11.replace(" ", "_").trim()+"/"+b.head._9.replace(" ", "_").trim(), b.size.toDouble )}).toMap
-        val totalCities = cities1.map(_._2).sum.toLong
-        val citiesHistogram:Map[String,Double] = cities1.map({case (city,count) => (city,count/totalCities)})
+              hashSet.groupBy({case tuple => (tuple._9,tuple._11,tuple._12)})
+                     .map({case (a,b) => (b.head._12, (b.size.toDouble , b.head._11.replace(" ", "_").trim()+"/"+b.head._9.replace(" ", "_").trim()))}).toMap
+        val totalCities = cities1.map({case (coord,(count,label))=> count }).sum.toLong
+        val citiesHistogram:Map[String,Double] = cities1.map({case (coord,(count,label)) => (coord,count/totalCities)})
+        val citiesHistogramLabels:Map[String,String] = cities1.map({case (coord,(count,label)) => (coord,label)})
         val citiesSavedHistogram=HogHBaseHistogram.getHistogram("HIST20-"+userName)
         
         // Atypical UserAgents
         val userAgents1:Map[String,Double] = 
               collection.mutable.Map() ++
-              hashSet.groupBy({case tuple => tuple._8})
-                     .map({case (a,b) => (HogStringUtils.md5(b.head._8.trim()), b.size.toDouble )}).toMap
+              hashSet.filter(!_._8.isEmpty())
+                     .groupBy({case tuple => tuple._8})
+                     .map({case (a,b) => (b.head._8, b.size.toDouble )}).toMap
         val totalUserAgents = userAgents1.map(_._2).sum.toLong
         val userAgentHistogram:Map[String,Double] = userAgents1.map({case (ua,count) => (ua,count/totalUserAgents)})
         val userAgentSavedHistogram=HogHBaseHistogram.getHistogram("HIST21-"+userName)
@@ -263,27 +276,35 @@ object HogAuth {
         
         // Atypical Cities
         if(citiesSavedHistogram.histSize< 10){
-        	HogHBaseHistogram.saveHistogram(Histograms.merge(citiesSavedHistogram, new HogHistogram("",totalCities,citiesHistogram)))
+        	HogHBaseHistogram.saveHistogram(Histograms.merge(citiesSavedHistogram, new HogHistogram("",totalCities,citiesHistogram,citiesHistogramLabels)))
         }else{
-        	    val atypicalCities   = Histograms.atypical(citiesSavedHistogram.histMap, citiesHistogram)
+        	    val atypicalCities   = 
+                Histograms.atypical(citiesSavedHistogram.histMap, citiesHistogram)
+                          .filter( { case (coords1)  =>  // Filter just far cities from the known cities.
+                                      ! citiesSavedHistogram.histLabels.keySet
+                                        .map ({ coords2 => HogGeograph.haversineDistanceFromStrings(coords1,coords2) < locationDistanceMinThreshold })
+                                        .contains(true)
+                                })
+                
 
         			if(atypicalCities.size>0 & citiesSavedHistogram.histMap.filter({case (key,value) => value > 0.001D}).size <5)
         			{
-        				val atypicalAccess = hashSet.filter({case tuple => atypicalCities.contains(tuple._11.replace(" ", "_").trim()+"/"+tuple._9.replace(" ", "_").trim())})
+        				val atypicalAccess = hashSet.filter({case tuple => atypicalCities.contains(tuple._12)})
+                val atypicalCitiesNames = atypicalAccess.map({ tuple => tuple._11.replace(" ", "_").trim()+"/"+tuple._9.replace(" ", "_").trim()})
                 
-                println("UserName: "+userName+ " - Atypical access location: "+atypicalCities.mkString(","))
+                println("UserName: "+userName+ " - Atypical access location: "+atypicalCitiesNames.mkString(","))
 
         				val flowMap: Map[String,String] = new HashMap[String,String]
         				flowMap.put("flow:id",System.currentTimeMillis.toString)
         				val event = new HogEvent(new HogFlow(flowMap,hashSet.head._5,hashSet.head._2))
                              
                 event.data.put("userName", userName) 
-                event.data.put("atypicalCities", atypicalCities.mkString(","))          
+                event.data.put("atypicalCities", atypicalCitiesNames.mkString(","))          
         				event.data.put("accessLogs",authTupleToString(atypicalAccess))
         				
         				populateAtypicalAccessLocation(event).alert()
         			}
-              HogHBaseHistogram.saveHistogram(Histograms.merge(citiesSavedHistogram, new HogHistogram("",totalCities,citiesHistogram)))
+              HogHBaseHistogram.saveHistogram(Histograms.merge(citiesSavedHistogram, new HogHistogram("",totalCities,citiesHistogram,citiesHistogramLabels)))
         }
         
         // Atypical UserAgents
@@ -294,16 +315,16 @@ object HogAuth {
 
               if(atypicalUserAgents.size>0 & userAgentSavedHistogram.histMap.filter({case (key,value) => value > 0.001D}).size <5)
               {
-                val atypicalAccess = hashSet.filter({case tuple => atypicalUserAgents.contains(HogStringUtils.md5(tuple._8.trim()))})
+                val atypicalAccess = hashSet.filter({case tuple => atypicalUserAgents.contains(tuple._8)})
                 
-                println("UserName: "+userName+ " - Atypical access UserAgent: "+atypicalUserAgents.mkString(","))
+                println("UserName: "+userName+ " - Atypical access UserAgent: "+atypicalAccess.map(_._8).mkString(","))
 
                 val flowMap: Map[String,String] = new HashMap[String,String]
                 flowMap.put("flow:id",System.currentTimeMillis.toString)
                 val event = new HogEvent(new HogFlow(flowMap,hashSet.head._5,hashSet.head._2))
                              
                 event.data.put("userName", userName) 
-                event.data.put("atypicalUserAgents", atypicalUserAgents.mkString(","))          
+                event.data.put("atypicalUserAgents", atypicalAccess.map(_._8).mkString(","))          
                 event.data.put("accessLogs",authTupleToString(atypicalAccess))
                 
                 populateAtypicalAccessUserAgent(event).alert()

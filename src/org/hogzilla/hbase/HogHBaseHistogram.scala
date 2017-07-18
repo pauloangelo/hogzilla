@@ -39,10 +39,11 @@ import org.hogzilla.histogram.Histograms
 
 object HogHBaseHistogram {
 
-  def mapByResult(result:Result):HashMap[String,Double] =
+  def mapByResult(result:Result):(HashMap[String,Double],HashMap[String,String]) =
   {
   
    val map=new HashMap[String,Double]
+   val mapLabels=new HashMap[String,String]
 
    if(!result.isEmpty())
    {
@@ -61,10 +62,13 @@ object HogHBaseHistogram {
           
           if(column.equals("values"))
              map.put(columnQualifier,value.toDouble)
+          else if (column.equals("labels")) {
+             mapLabels.put(columnQualifier,value)
+          }
        }  
     }
    
-    map
+    (map,mapLabels)
   }
   
   def getHistogram(histName:String):HogHistogram =  
@@ -73,7 +77,9 @@ object HogHBaseHistogram {
      val get1 = new Get(Bytes.toBytes(histName))
      
     val result = HogHBaseRDD.hogzilla_histograms.get(get1)  //getScanner(new Scan()).iterator()
-    val map=mapByResult(result)
+    val tuple=mapByResult(result)
+    val map=tuple._1
+    val mapLabels=tuple._2
     
      if(!map.isEmpty)
      {
@@ -81,16 +87,16 @@ object HogHBaseHistogram {
        val sizeArray = result.getValue(Bytes.toBytes("info"), Bytes.toBytes("size"))
        if(sizeArray.length==0)
        {
-         new HogHistogram(histName,0L,map)
+         new HogHistogram(histName,0L,map,mapLabels)
        }
        else
        {
-         new HogHistogram(histName,Bytes.toString(sizeArray).toLong,map)
+         new HogHistogram(histName,Bytes.toString(sizeArray).toLong,map,mapLabels)
        }
        
     }else
     {
-      new HogHistogram(histName,0,map)
+      new HogHistogram(histName,0,map,mapLabels)
     }
 	}
   
@@ -98,7 +104,7 @@ object HogHBaseHistogram {
   //def saveHistogram(histName:String,size:Long,hist:Map[String,Double]) =
   def saveHistogram(hogHist:HogHistogram) =
   {
-      val (histName,size,map) = (hogHist.histName, hogHist.histSize, hogHist.histMap)
+      val (histName,size,map,mapLabels) = (hogHist.histName, hogHist.histSize, hogHist.histMap, hogHist.histLabels)
     
       val put = new Put(Bytes.toBytes(histName))
       
@@ -108,7 +114,11 @@ object HogHBaseHistogram {
       map./:(0){ case (ac,(port,weight)) =>
                                 put.add(Bytes.toBytes("values"), Bytes.toBytes(port), Bytes.toBytes(weight.toString()))
                                            0 }
-      
+      if(mapLabels!=null)
+      mapLabels./:(0){ case (ac,(key,label)) =>
+                                put.add(Bytes.toBytes("labels"), Bytes.toBytes(key), Bytes.toBytes(label))
+                                           0 }
+     
       
       HogHBaseRDD.hogzilla_histograms.delete(new Delete(put.getRow))
       HogHBaseRDD.hogzilla_histograms.put(put)

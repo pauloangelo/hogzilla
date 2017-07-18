@@ -20,9 +20,9 @@
 package org.hogzilla.histogram
 
 import scala.collection.mutable.Map
+import scala.collection.mutable.HashMap
 
-class HogHistogram(val histName:String,val histSize:Long, val histMap:Map[String,Double]) 
+class HogHistogram(val histName:String,val histSize:Long, val histMap:Map[String,Double], val histLabels:Map[String,String]=new HashMap[String,String]) 
 {
-
+  
 }
-

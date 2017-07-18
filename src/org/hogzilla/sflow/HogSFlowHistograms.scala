@@ -110,7 +110,7 @@ object HogSFlowHistograms {
                                     
                                       val histogramSize    = Bytes.toString(result.getValue(Bytes.toBytes("info"), Bytes.toBytes("size"))).toLong
                                       val histogramName    = Bytes.toString(result.getValue(Bytes.toBytes("info"), Bytes.toBytes("name")))
-                                      val histMap          = HogHBaseHistogram.mapByResult(result)
+                                      val histMap          = HogHBaseHistogram.mapByResult(result)._1
                                       
                                       val keys:Set[Long] = histMap.filter({ case (key,value) =>
                                         
