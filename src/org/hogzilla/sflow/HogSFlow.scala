@@ -133,6 +133,7 @@ object HogSFlow {
    val mediaClientPairsThreshold                    = p2pPairs2ndMethodThreshold
    val mediaClientUploadThreshold         = HogConfig.getLong(config,"mediaStreaming.maxUploadBytes",10000000L) // ~10MB
    val mediaClientDownloadThreshold       = HogConfig.getLong(config,"mediaStreaming.minDownloadBytes",1000000L) // 1MB
+   val mediaClientExcludedPorts           = HogConfig.getSetString(config,"mediaStreaming.excludePorts",Set("1194")) 
    val dnsTunnelThreshold                 = HogConfig.getLong(config,"dnsTunnel.minBytes",50000000L) // ~50 MB
    val bigProviderThreshold               = HogConfig.getLong(config,"bigProviders.minBytes",1073741824L) // (1*1024*1024*1024 = 1G)
    val icmpTunnelThreshold                = HogConfig.getInt (config,"ICMPTunnel.minPacket",200) // 200b
@@ -148,6 +149,25 @@ object HogSFlow {
    val FlowListLimit                      = HogConfig.getInt (config,"alert.maxFlowList",1000)
    val CCminPktsPerFlow                   = HogConfig.getInt (config,"BotNet.minPktsPerFlow",20)
   
+   
+   val disable_abusedSMTP          = HogConfig.getInt(config,"abusedSMTP.disabled",0)
+   val disable_alien               = HogConfig.getInt(config,"alien.disabled",0)
+   val disable_atypicalAlienPorts  = HogConfig.getInt(config,"atypicalAlienPorts.disabled",0)
+   val disable_atypicalData        = HogConfig.getInt(config,"atypicalData.disabled",0)
+   val disable_atypicalPairs       = HogConfig.getInt(config,"atypicalPairs.disabled",0)
+   val disable_atypicalPorts       = HogConfig.getInt(config,"atypicalPorts.disabled",0)
+   val disable_BotNet              = HogConfig.getInt(config,"BotNet.disabled",0)
+   val disable_DDoS                = HogConfig.getInt(config,"DDoS.disabled",0)
+   val disable_UDPAmplifier        = HogConfig.getInt(config,"UDPAmplifier.disabled",0)
+   val disable_dnsTunnel           = HogConfig.getInt(config,"dnsTunnel.disabled",0)
+   val disable_hPortScan           = HogConfig.getInt(config,"hPortScan.disabled",0)
+   val disable_ICMPTunnel          = HogConfig.getInt(config,"ICMPTunnel.disabled",0)
+   val disable_mediaStreaming      = HogConfig.getInt(config,"mediaStreaming.disabled",0)
+   val disable_p2p                 = HogConfig.getInt(config,"p2p.disabled",0)
+   val disable_SMTPTalkers         = HogConfig.getInt(config,"SMTPTalkers.disabled",0)
+   val disable_topTalkers          = HogConfig.getInt(config,"topTalkers.disabled",0)
+   val disable_vPortScan           = HogConfig.getInt(config,"vPortScan.disabled",0)
+
   // val topTalkersThreshold:Long    = HogConfig.getLong(config,"topTalkers.threshold",21474836480L) // (20*1024*1024*1024 = 20G)
    //val mediaClientDownloadThreshold = 10000000L // ~10MB
   
@@ -763,6 +783,7 @@ object HogSFlow {
                                       val packetSize  = Bytes.toString(result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("packetSize"))).toLong
                                       val tcpFlags    = Bytes.toString(result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("tcpFlags")))
                                       val IPprotocol  = Bytes.toString(result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("IPprotocol")))
+                                      // TODO retirar possível "\x00" no final
                                       val timestamp   = Bytes.toString(result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("timestamp"))).toLong
                                       val sampleRate   = Bytes.toString(result.getValue(Bytes.toBytes("flow"),Bytes.toBytes("samplingRate"))).toLong
 
@@ -982,13 +1003,17 @@ object HogSFlow {
   * SMTP Talkers
   * 
   */
+
+  if(disable_SMTPTalkers==0)
+  {
+    
   val whiteSMTPTalkers =  HogHBaseReputation.getReputationList("MX","whitelist")
 
   println("")
   println("SMTP Talkers:")
   println("(SRC IP, DST IP, Bytes, Qtd Flows)")
   
-  
+    
    val SMTPTalkersCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long,Int)],Long,Long)] = 
     sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
@@ -1047,13 +1072,13 @@ object HogSFlow {
                     
                     populateSMTPTalker(event).alert()
            }
-  
 
+  }
+  
  /*
   * FTP, etc.. Talkers
   *   
-  */
-     
+  */ 
   println("")
   println("FTP Talker")
   
@@ -1157,7 +1182,8 @@ object HogSFlow {
          event.data.put("bytesDown", (bytesDown*sampleRate).toString)
          event.data.put("numberPkts", numberPkts.toString)
          event.data.put("stringFlows", setFlows2String(flowSet))
-                           
+        
+         if(disable_p2p==0)                  
          populateP2PCommunication(event).alert()
          
          myIP
@@ -1222,15 +1248,23 @@ object HogSFlow {
          event.data.put("bytesDown", (bytesDown*sampleRate).toString)
          event.data.put("numberPkts", numberPkts.toString)
          event.data.put("stringFlows", setFlows2String(flowSet))
-                           
+                  
+         if(disable_p2p==0)
          populateP2PCommunication(event).alert()
          
          myIP
     }).toArray.toSet
     
     val p2pTalkers = p2pTalkers1st ++ p2pTalkers2nd
+  
+  
+  /**
+   * 
+   * Media Streaming Client
+   * 
+   */
 
-
+   
   println("Media streaming clients")
   val mediaClientCollection:PairRDDFunctions[(String,String), (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long,Int)],
                                             Long,Long,Long,Long)] = 
@@ -1292,13 +1326,14 @@ object HogSFlow {
          event.data.put("numberPkts", numberPkts.toString)
          event.data.put("connections", flowSet.size.toString)
          event.data.put("stringFlows", setFlows2String(flowSet)) 
-                           
+         
+         if(disable_mediaStreaming==0)
          populateMediaClient(event).alert()
          
          myIP
     }).toArray.toSet
 
-    
+  
   
  
  /*
@@ -1308,13 +1343,14 @@ object HogSFlow {
   * 
   */
   
+ val proxyServers = HogHBaseReputation.getReputationList("ProxyServer", "whitelist")
 
+ if(disable_atypicalPorts<=1)
+ {
   println("")
   println("Atypical TCP port used")
   
- val proxyServers = HogHBaseReputation.getReputationList("ProxyServer", "whitelist")
-
-          
+  
  val atypicalTCPCollection: PairRDDFunctions[String, (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long,Int)],
                                              Map[String,Double],Long,Long)] = 
     sflowSummary
@@ -1459,13 +1495,14 @@ object HogSFlow {
                             event.data.put("numberPkts", numberPkts.toString)
                             event.data.put("stringFlows", setFlows2String(flowSet.filter({p => atypical.contains(p._2)})))
                     
+                             if(disable_atypicalPorts==0)
                             populateAtypicalTCPPortUsed(event).alert()
                           }
                       HogHBaseHistogram.saveHistogram(Histograms.merge(hogHistogram, new HogHistogram("",numberOfFlows,newHistogram)))
                     }
              }
   
-    
+ }  
     
  /*
   * 
@@ -1474,7 +1511,8 @@ object HogSFlow {
   * 
   */
   
-
+if(disable_atypicalAlienPorts<=1)
+ {
   println("")
   println("Atypical alien TCP port used")
   
@@ -1639,6 +1677,7 @@ object HogSFlow {
                             event.data.put("numberPkts", numberPkts.toString)
                             event.data.put("stringFlows", setFlows2String(flowSet.filter({p => newAtypical.contains(p._4)})))
                     
+                            if(disable_atypicalAlienPorts==0)
                             populateAtypicalAlienTCPPortUsed(event).alert()
                           }
                            
@@ -1652,7 +1691,8 @@ object HogSFlow {
                     
              }
  
-    
+ }
+
       
  /*
   * 
@@ -1661,7 +1701,9 @@ object HogSFlow {
   * 
   */
     
-    
+ if(disable_atypicalPairs<=1)
+ {
+  
   println("")
   println("Atypical number of pairs in the period")
  
@@ -1739,6 +1781,7 @@ object HogSFlow {
                             event.data.put("pairsMean", pairsStats.mean.round.toString)
                             event.data.put("pairsStdev", pairsStats.stdev.round.toString)
                             
+                            if(disable_atypicalPairs==0)
                             populateAtypicalNumberOfPairs(event).alert()
                           }
                           
@@ -1746,14 +1789,17 @@ object HogSFlow {
                     }
              }
   
-    
+     
+ } 
        
  /*
   * 
   * Atypical amount of data transfered
   * 
   */
-   
+  
+ if(disable_atypicalData<=1)
+ {
   println("")
   println("Atypical amount of data transfered")
   
@@ -1842,6 +1888,7 @@ object HogSFlow {
                             event.data.put("dataMean", dataStats.mean.round.toString)
                             event.data.put("dataStdev", dataStats.stdev.round.toString)
                             
+                            if(disable_atypicalData==0)
                             populateAtypicalAmountData(event).alert()
                           }
                           
@@ -1849,7 +1896,7 @@ object HogSFlow {
                     }
              }
   
-  
+ }
  
    
  /*
@@ -1859,6 +1906,7 @@ object HogSFlow {
   * 
   */
 
+ 
   println("")
   println("Atypical TCP port used by Alien Network")
           
@@ -1991,7 +2039,8 @@ object HogSFlow {
   * 
   */
   
-    
+ if(disable_alien<=1)
+ {   
   println("")
   println("Aliens accessing more than "+alienThreshold+" hosts")
  
@@ -2047,15 +2096,20 @@ object HogSFlow {
                                                    .mkString(", ")
                                             )
                             
+                            if(disable_alien==0)
                             populateAlienAccessingManyHosts(event).alert()
                     }
            }
-  
+ }
+ 
   /*
    * 
    * UDP amplifier (DDoS)
    * 
    */
+ 
+ if(disable_UDPAmplifier<=1)
+ { 
   println("")
   println("UDP amplifier (DDoS)")
   
@@ -2105,16 +2159,18 @@ object HogSFlow {
                     event.data.put("connections", connections.toString)
                     event.data.put("stringFlows", setFlows2String(flowSet))
                     
+                    if(disable_UDPAmplifier==0)
                     populateUDPAmplifier(event).alert()
            }
-   
+ } 
   
   /*
    * 
    *  Abused SMTP Server
    * 
    */
-   
+  if(disable_abusedSMTP<=1)
+ {  
   println("")
   println("Abused SMTP Server")
    val abusedSMTPCollection: PairRDDFunctions[(String, String), (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long,Int)],Long,Long)] = sflowSummary
@@ -2161,15 +2217,18 @@ object HogSFlow {
                     event.data.put("connections", connections.toString)
                     event.data.put("stringFlows", setFlows2String(flowSet))
                     
+                     if(disable_abusedSMTP==0)
                     populateAbusedSMTP(event).alert()
            }
-   
+ }
  
    /*
    * 
    *  DNS tunnels
    * 
    */
+  if(disable_dnsTunnel==0)
+  { 
    
   println("")
   println("DNS tunnels")
@@ -2215,7 +2274,7 @@ object HogSFlow {
                     
                     populateDNSTunnel(event).alert()
            }
-  
+  }
   
   
   
@@ -2225,6 +2284,9 @@ object HogSFlow {
    *  ICMP tunnels
    * 
    */
+  
+  if(disable_ICMPTunnel==0)
+  { 
    
   println("")
   println("ICMP tunnels")
@@ -2271,7 +2333,7 @@ object HogSFlow {
                     
                     populateICMPTunnel(event).alert()
            }
-  
+  }
   
   
  /*
@@ -2282,7 +2344,9 @@ object HogSFlow {
   */
   //val hPortScanMinFlowsThreshold = 300
   
-    
+  
+  if(disable_hPortScan<=1)
+  {   
   println("")
   println("Horizontal portscan")
  
@@ -2406,14 +2470,15 @@ object HogSFlow {
                                                    .map({case (proto,alienPort) => proto+"/"+alienPort})
                                                    .mkString(", ")
                                             )
-                            
+                                            
+                            if(disable_hPortScan==0)
                             populateHorizontalPortScan(event).alert()
                           }
                           
                           HogHBaseHistogram.saveHistogram(Histograms.mergeMax(savedHistogram, new HogHistogram("",numberOfflows,histogram)))
                     }
              }
-  
+  }
   
   
  /*
@@ -2424,7 +2489,8 @@ object HogSFlow {
   */
   //val vPortScanMinPortsThreshold = 3
   
-    
+  if(disable_vPortScan<=1)
+  {  
   println("")
   println("Vertical portscan")
  
@@ -2512,6 +2578,7 @@ object HogSFlow {
                             event.data.put("portsMean", vPortScanStats.mean.round.toString)
                             event.data.put("portsStdev", vPortScanStats.stdev.round.toString)
                             
+                            if(disable_vPortScan==0)
                             populateVerticalPortScan(event).alert()
                           }
                           
@@ -2519,7 +2586,7 @@ object HogSFlow {
                     }
              }
   
-  
+  }
   
   
   
@@ -2531,7 +2598,8 @@ object HogSFlow {
   * 
   */
 
-    
+  if(disable_DDoS<=1)
+  {   
   println("")
   println("Server under DDoS attack")
  
@@ -2624,13 +2692,13 @@ object HogSFlow {
                             event.data.put("stringFlows", setFlows2String(flowSet))
                             event.data.put("flowsMean", ddosStats.mean.round.toString)
                             event.data.put("flowsStdev", ddosStats.stdev.round.toString)
-                            
-                            // TODO: 
+                        
+                           if(disable_DDoS==0)
                            populateDDoSAttack(event).alert()
                   
           }
   
-  
+  }
  
    
    /*
@@ -2638,6 +2706,10 @@ object HogSFlow {
    *  C&C BotNets
    *
    */  
+  
+  if(disable_BotNet<=1)
+  { 
+    
   object ccBotNets  {
     val _set = new scala.collection.mutable.TreeSet[String]
     HogHBaseReputation.getReputationList("CCBotNet", "blacklist")
@@ -2689,9 +2761,11 @@ object HogSFlow {
                     event.data.put("aliens", aliens.mkString(","))
                     event.data.put("stringFlows", setFlows2String(flowSet)) 
                     
+                    if(disable_BotNet==0)
                     populateCCBotNet(event).alert()
            }
-  
+ 
+  } 
   
  /*
   * 

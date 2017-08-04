@@ -49,6 +49,9 @@ import org.hogzilla.util.HogFlow
 import org.hogzilla.util.HogFlow
 import org.hogzilla.util.HogGeograph
 import org.hogzilla.util.HogStringUtils
+import com.typesafe.config.ConfigFactory
+import java.io.File
+import org.hogzilla.util.HogConfig
 
 
 /**
@@ -59,10 +62,16 @@ object HogAuth {
                                                                                           
   val signature = (HogSignature(3,"HZ/Auth: Atypical access location" ,                2,1,826001201,826).saveHBase(), //1
                    HogSignature(3,"HZ/Auth: Atypical access user-agent" ,              2,1,826001202,826).saveHBase(), //2
-                   HogSignature(3,"HZ/Auth: Atypical access system" ,                  2,1,826001203,826).saveHBase()) //3
+                   HogSignature(3,"HZ/Auth: Atypical access service or system" ,                  2,1,826001203,826).saveHBase()) //3
+                
+   val config = ConfigFactory.parseFile(new File("auth.conf"))
                 
    // In KM, doesn't alert if the new location is near a typical location
-   val locationDistanceMinThreshold = 300
+   val locationDistanceMinThreshold = HogConfig.getInt (config,"location.allowedRadix",300)
+   val excludedCities = HogConfig.getSetString (config,"location.excludedCities",Set("Campinas"))
+   val locationDisabled = HogConfig.getInt(config,"location.disabled",0) // 1: just training, 2: nothing
+   val UADisabled = HogConfig.getInt(config,"useragent.disabled",0) // 1: just training, 2: nothing
+   val serviceDisabled = HogConfig.getInt(config,"system.disabled",0) // 1: just training, 2: nothing
  
   /**
    * 
@@ -72,7 +81,12 @@ object HogAuth {
   def run(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)],spark:SparkContext)
   {
     
-   //  XXX: Organize it!
+    
+   if(locationDisabled>=2 &&
+      UADisabled >=2 &&
+      serviceDisabled>=2)
+     return
+    
    realRun(HogRDD,spark)
  
   }
@@ -275,21 +289,29 @@ object HogAuth {
       
         
         // Atypical Cities
+        if(locationDisabled<2) // if not fully disabled
         if(citiesSavedHistogram.histSize< 10){
         	HogHBaseHistogram.saveHistogram(Histograms.merge(citiesSavedHistogram, new HogHistogram("",totalCities,citiesHistogram,citiesHistogramLabels)))
         }else{
         	    val atypicalCities   = 
                 Histograms.atypical(citiesSavedHistogram.histMap, citiesHistogram)
-                          .filter( { case (coords1)  =>  // Filter just far cities from the known cities.
+                         /* Implemented below
+                           .filter( { case (coords1)  =>  // Filter just far cities from the known cities.
                                       ! citiesSavedHistogram.histLabels.keySet
                                         .map ({ coords2 => HogGeograph.haversineDistanceFromStrings(coords1,coords2) < locationDistanceMinThreshold })
                                         .contains(true)
-                                })
+                                })*/
                 
 
         			if(atypicalCities.size>0 & citiesSavedHistogram.histMap.filter({case (key,value) => value > 0.001D}).size <5)
         			{
-        				val atypicalAccess = hashSet.filter({case tuple => atypicalCities.contains(tuple._12)})
+        				val atypicalAccess = hashSet.filter({case tuple => 
+                                                           atypicalCities.contains(tuple._12) &&
+                                                           ! citiesSavedHistogram.histLabels.keySet
+                                                             .map ({ coords2 => HogGeograph.haversineDistanceFromStrings(tuple._12,coords2) < locationDistanceMinThreshold })
+                                                             .contains(true) &&
+                                                           ! excludedCities.contains(tuple._11)  
+                                                    })
                 val atypicalCitiesNames = atypicalAccess.map({ tuple => tuple._11.replace(" ", "_").trim()+"/"+tuple._9.replace(" ", "_").trim()})
                 
                 println("UserName: "+userName+ " - Atypical access location: "+atypicalCitiesNames.mkString(","))
@@ -301,13 +323,15 @@ object HogAuth {
                 event.data.put("userName", userName) 
                 event.data.put("atypicalCities", atypicalCitiesNames.mkString(","))          
         				event.data.put("accessLogs",authTupleToString(atypicalAccess))
-        				
+        			
+                if(locationDisabled<1 && atypicalAccess.size>0)
         				populateAtypicalAccessLocation(event).alert()
         			}
               HogHBaseHistogram.saveHistogram(Histograms.merge(citiesSavedHistogram, new HogHistogram("",totalCities,citiesHistogram,citiesHistogramLabels)))
         }
         
         // Atypical UserAgents
+        if(UADisabled<2) // if not fully disabled
         if(userAgentSavedHistogram.histSize< 10){
           HogHBaseHistogram.saveHistogram(Histograms.merge(userAgentSavedHistogram, new HogHistogram("",totalUserAgents,userAgentHistogram)))
         }else{
@@ -315,7 +339,8 @@ object HogAuth {
 
               if(atypicalUserAgents.size>0 & userAgentSavedHistogram.histMap.filter({case (key,value) => value > 0.001D}).size <5)
               {
-                val atypicalAccess = hashSet.filter({case tuple => atypicalUserAgents.contains(tuple._8)})
+                val atypicalAccess = hashSet.filter({case tuple => atypicalUserAgents.contains(tuple._8) && 
+                                                                   ! excludedCities.contains(tuple._11) })
                 
                 println("UserName: "+userName+ " - Atypical access UserAgent: "+atypicalAccess.map(_._8).mkString(","))
 
@@ -327,12 +352,14 @@ object HogAuth {
                 event.data.put("atypicalUserAgents", atypicalAccess.map(_._8).mkString(","))          
                 event.data.put("accessLogs",authTupleToString(atypicalAccess))
                 
+                if(UADisabled<1 && atypicalAccess.size>0)
                 populateAtypicalAccessUserAgent(event).alert()
               }
               HogHBaseHistogram.saveHistogram(Histograms.merge(userAgentSavedHistogram, new HogHistogram("",totalUserAgents,userAgentHistogram)))
         }
         
         // Atypical Server/Service
+        if(serviceDisabled<2) // if not fully disabled
         if(servicesSavedHistogram.histSize< 10){
           HogHBaseHistogram.saveHistogram(Histograms.merge(servicesSavedHistogram, new HogHistogram("",totalServices,servicesHistogram)))
         }else{
@@ -340,7 +367,8 @@ object HogAuth {
 
               if(atypicalServices.size>0 & servicesSavedHistogram.histMap.filter({case (key,value) => value > 0.001D}).size <5)
               {
-                val atypicalAccess = hashSet.filter({case tuple => atypicalServices.contains(tuple._2.replace(" ", "_").trim()+"/"+tuple._3.replace(" ", "_").trim())})
+                val atypicalAccess = hashSet.filter({case tuple => atypicalServices.contains(tuple._2.replace(" ", "_").trim()+"/"+tuple._3.replace(" ", "_").trim()) && 
+                                                                   ! excludedCities.contains(tuple._11) })
                 
                 println("UserName: "+userName+ " - Atypical access services: "+atypicalServices.mkString(","))
 
@@ -352,6 +380,7 @@ object HogAuth {
                 event.data.put("atypicalServices", atypicalServices.mkString(","))          
                 event.data.put("accessLogs",authTupleToString(atypicalAccess))
                 
+                if(serviceDisabled<1 && atypicalAccess.size>0)
                 populateAtypicalAccessService(event).alert()
               }
               HogHBaseHistogram.saveHistogram(Histograms.merge(servicesSavedHistogram, new HogHistogram("",totalServices,servicesHistogram)))
