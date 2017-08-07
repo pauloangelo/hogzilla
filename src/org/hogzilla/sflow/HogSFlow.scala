@@ -630,8 +630,9 @@ object HogSFlow {
                   "Bytes Up: "+humanBytes(bytesUp)+"\n"+
                   "Bytes Down: "+humanBytes(bytesDown)+"\n"+
                   "Packets: "+numberPkts+"\n"+
-                  "Connections: "+connections+"\n"+
-                  "VirusTotal ref.: https://www.virustotal.com/en/ip-address/"+hostname+"/information/"+"\n"+
+                  "Connections: "+connections+"\n"+aliens.split(",")
+                  .mkString("VirusTotal ref.: https://www.virustotal.com/en/ip-address/",
+                      "\n VirusTotal ref.: https://www.virustotal.com/en/ip-address/", "\n")
                   "Flows"+stringFlows
                   
     event.signature_id = signature._17.signature_id       

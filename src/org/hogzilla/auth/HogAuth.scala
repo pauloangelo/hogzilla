@@ -68,7 +68,9 @@ object HogAuth {
                 
    // In KM, doesn't alert if the new location is near a typical location
    val locationDistanceMinThreshold = HogConfig.getInt (config,"location.allowedRadix",300)
-   val excludedCities = HogConfig.getSetString (config,"location.excludedCities",Set("Campinas"))
+   val locationExcludedCities = HogConfig.getSetString (config,"location.excludedCities",Set("Campinas"))
+   val UAexcludedCities = HogConfig.getSetString (config,"useragent.excludedCities",Set())
+   val systemExcludedCities = HogConfig.getSetString (config,"system.excludedCities",Set())
    val locationDisabled = HogConfig.getInt(config,"location.disabled",0) // 1: just training, 2: nothing
    val UADisabled = HogConfig.getInt(config,"useragent.disabled",0) // 1: just training, 2: nothing
    val serviceDisabled = HogConfig.getInt(config,"system.disabled",0) // 1: just training, 2: nothing
@@ -310,7 +312,7 @@ object HogAuth {
                                                            ! citiesSavedHistogram.histLabels.keySet
                                                              .map ({ coords2 => HogGeograph.haversineDistanceFromStrings(tuple._12,coords2) < locationDistanceMinThreshold })
                                                              .contains(true) &&
-                                                           ! excludedCities.contains(tuple._11)  
+                                                           ! locationExcludedCities.contains(tuple._11)  
                                                     })
                 val atypicalCitiesNames = atypicalAccess.map({ tuple => tuple._11.replace(" ", "_").trim()+"/"+tuple._9.replace(" ", "_").trim()})
                 
@@ -340,7 +342,7 @@ object HogAuth {
               if(atypicalUserAgents.size>0 & userAgentSavedHistogram.histMap.filter({case (key,value) => value > 0.001D}).size <5)
               {
                 val atypicalAccess = hashSet.filter({case tuple => atypicalUserAgents.contains(tuple._8) && 
-                                                                   ! excludedCities.contains(tuple._11) })
+                                                                   ! UAexcludedCities.contains(tuple._11) })
                 
                 println("UserName: "+userName+ " - Atypical access UserAgent: "+atypicalAccess.map(_._8).mkString(","))
 
@@ -368,7 +370,7 @@ object HogAuth {
               if(atypicalServices.size>0 & servicesSavedHistogram.histMap.filter({case (key,value) => value > 0.001D}).size <5)
               {
                 val atypicalAccess = hashSet.filter({case tuple => atypicalServices.contains(tuple._2.replace(" ", "_").trim()+"/"+tuple._3.replace(" ", "_").trim()) && 
-                                                                   ! excludedCities.contains(tuple._11) })
+                                                                   ! systemExcludedCities.contains(tuple._11) })
                 
                 println("UserName: "+userName+ " - Atypical access services: "+atypicalServices.mkString(","))
 
