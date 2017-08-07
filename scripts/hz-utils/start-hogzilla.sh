@@ -7,7 +7,7 @@ HBASE_VERSION="1.2.6"
 # Needed by the AuthModule
 HOGDIR="/home/hogzilla/hogzilla"
 EXTRAJAR=",$HOGDIR/jars/uap-scala_2.10-0.2.1-SNAPSHOT.jar,$HOGDIR/jars/snakeyaml-1.18.jar"
-FILES="--files $HOGDIR/conf/sflow.conf"
+FILES="--files $HOGDIR/conf/sflow.conf,$HOGDIR/conf/auth.conf"
 
 
 
