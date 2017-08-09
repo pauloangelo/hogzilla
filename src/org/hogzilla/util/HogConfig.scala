@@ -39,14 +39,13 @@ object HogConfig {
     if(config==null)
       return default
     
-      
-    val value = config.getString(key)
     
-    if(value.isEmpty())
-      return default // Return default value
-    else
-    {
       try {
+        
+        val value = config.getString(key)
+        
+        if(value.isEmpty())
+          return default // Return default value
         
         println(f"Configuration: $key => $value")
        
@@ -77,12 +76,11 @@ object HogConfig {
           
       } catch {
         case t: Throwable =>//t.printStackTrace() 
-        println(f"Problem parsing $key = $value . Check if it is ok. Using default value")
+        println(f"Problem parsing $key . Check if it is ok. Using default value")
         
         return default
       } 
   
-    }
   }
   
   def getInt(config:Config,key:String,default:Any):Int =

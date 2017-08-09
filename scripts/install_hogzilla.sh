@@ -398,7 +398,8 @@ cmd "sleep 3"
 
 
 msg_info "Will insert data into HBase now!"
-cmd "echo \"create 'hogzilla_flows','flow','event'\"                      > /tmp/.hogzilla_hbase_script"
+cmd "echo \"\"                                                            > /tmp/.hogzilla_hbase_script"
+cmd "echo \"create 'hogzilla_flows','flow','event'\"                      >>/tmp/.hogzilla_hbase_script"
 cmd "echo \"create 'hogzilla_sflows','flow'\"                             >> /tmp/.hogzilla_hbase_script"
 cmd "echo \"create 'hogzilla_events','event'\"                            >> /tmp/.hogzilla_hbase_script"
 cmd "echo \"create 'hogzilla_sensor','sensor'\"                           >> /tmp/.hogzilla_hbase_script"
