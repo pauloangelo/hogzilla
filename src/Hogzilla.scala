@@ -72,9 +72,9 @@ object Hogzilla {
     val HogRDDHistograms = HogHBaseRDD.connectHistograms(spark);
     HogSFlowHistograms.run(HogRDDHistograms,spark);
     
-    
-    val HogRDDAuth = HogHBaseRDD.connectAuth(spark);
-    HogAuth.run(HogRDDAuth,spark);
+    // Use continuous mode
+    //val HogRDDAuth = HogHBaseRDD.connectAuth(spark);
+    //HogAuth.run(HogRDDAuth,spark);
      
     
     // Stop Spark

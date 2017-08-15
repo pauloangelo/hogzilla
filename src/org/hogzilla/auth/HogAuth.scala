@@ -52,6 +52,8 @@ import org.hogzilla.util.HogStringUtils
 import com.typesafe.config.ConfigFactory
 import java.io.File
 import org.hogzilla.util.HogConfig
+import org.apache.hadoop.hbase.client.Delete
+import org.apache.hadoop.hbase.client.Result
 
 
 /**
@@ -93,6 +95,19 @@ object HogAuth {
      return
     
    realRun(HogRDD,spark)
+ 
+  }
+  
+  def runDeleting(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)],spark:SparkContext)
+  {
+    
+    
+   if(locationDisabled>=2 &&
+      UADisabled >=2 &&
+      serviceDisabled>=2)
+     return
+    
+   realRun(HogRDD,spark,true)
  
   }
   
@@ -175,9 +190,9 @@ object HogAuth {
           loginFailedString="FAILED"
           
           if(clientReverse.equals(""))
-			      c+"\n"+clientIP+" => "+agent+":"+service+"  [Location: "+city+"/"+region+"/"+country+", UA: "+userAgent+", AuthMethod: "+authMethod+", ASN: "+asn+", "+loginFailedString+"]"
+			      c+"\n"+clientIP+" => "+agent+":"+service+"  [Location: "+city+"/"+country+", UA: "+userAgent+", AuthMethod: "+authMethod+", ASN: "+asn+", "+loginFailedString+"]"
           else
-            c+"\n"+clientIP+"("+clientReverse+") => "+agent+":"+service+"  [Location: "+city+"/"+region+"/"+country+", UA: "+userAgent+", AuthMethod: "+authMethod+", ASN: "+asn+", "+loginFailedString+"]"
+            c+"\n"+clientIP+"("+clientReverse+") => "+agent+":"+service+"  [Location: "+city+"/"+country+", UA: "+userAgent+", AuthMethod: "+authMethod+", ASN: "+asn+", "+loginFailedString+"]"
 		  })
 	  }
   
@@ -188,7 +203,7 @@ object HogAuth {
    * 
    * 
    */
-  def realRun(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)],spark:SparkContext)
+  def realRun(HogRDD: RDD[(org.apache.hadoop.hbase.io.ImmutableBytesWritable,org.apache.hadoop.hbase.client.Result)],spark:SparkContext, deleteRecord:Boolean=false):RDD[(Double,String,String,String,String,String,String,Int,String,String,String,String,String,String,Result)] =
   {
     
    val myNetsTemp =  new HashSet[String]
@@ -202,8 +217,8 @@ object HogAuth {
    val myNets:scala.collection.immutable.Set[String] = myNetsTemp.toSet
    
   
-  println("Mapping auth records...")                     
-  val summary1: RDD[(Double,String,String,String,String,String,String,Int,String,String,String,String,String,String)] 
+  //println("Mapping auth records...")                     
+  val summary1: RDD[(Double,String,String,String,String,String,String,Int,String,String,String,String,String,String,Result)] 
                       = HogRDD
                         .map ({  case (id,result) => 
                                     
@@ -237,19 +252,23 @@ object HogAuth {
                                       val coords         = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("coords")))
                                       val asn            = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("asn")))
                                       
+                                      if(deleteRecord)
+                                         HogHBaseRDD.hogzilla_authrecords.delete(new Delete(result.getRow))
+
+                                      
                                       (generatedTime, agent, service, clientReverse, clientIP, userName, authMethod, 
-                                          loginFailed, clientUA, country, region, city, coords, asn)
+                                          loginFailed, clientUA, country, region, city, coords, asn, result)
                            }).cache
 
-  println("Counting auth records...")                         
+  //println("Counting auth records...")                         
   val summary1Count = summary1.count()
   if(summary1Count.equals(0))
-    return
+    return summary1;
     
   val summaryUser:PairRDDFunctions[(String),(String,HashSet[(Double,String,String,String,String,String,Int,String,String,String,String,String,String)])] =                     
         summary1
         .map({case (generatedTime, agent, service, clientReverse, clientIP, userName, authMethod, 
-                                          loginFailed, userAgent, country, region, city, coords, asn) =>
+                                          loginFailed, userAgent, country, region, city, coords, asn, result) =>
                 val authSet:HashSet[(Double,String,String,String,String,String,Int,String,String,String,String,String,String)] = new HashSet()  
                     authSet.add((generatedTime, agent, service, clientReverse, clientIP, authMethod, 
                                           loginFailed, userAgent, country, region, city, coords, asn))                     
@@ -264,7 +283,7 @@ object HogAuth {
     .values
     .foreach{ case (userName,hashSet) => 
       
-        println(f"Auth profile for user $userName")
+        //println(f"Auth profile for user $userName")
       
         // Atypical Cities
         val cities1:Map[String,(Double,String)] = 
@@ -323,20 +342,23 @@ object HogAuth {
                                                               .map { domain => tuple._4.endsWith(domain) }
                                                               .contains(true) 
                                                     })
-                val atypicalCitiesNames = atypicalAccess.map({ tuple => tuple._11.replace(" ", "_").trim()+"/"+tuple._9.replace(" ", "_").trim()})
-                
-                println("UserName: "+userName+ " - Atypical access location: "+atypicalCitiesNames.mkString(","))
-
-        				val flowMap: Map[String,String] = new HashMap[String,String]
-        				flowMap.put("flow:id",System.currentTimeMillis.toString)
-        				val event = new HogEvent(new HogFlow(flowMap,atypicalAccess.head._5,atypicalAccess.head._2))
-                             
-                event.data.put("userName", userName) 
-                event.data.put("atypicalCities", atypicalCitiesNames.mkString(","))          
-        				event.data.put("accessLogs",authTupleToString(atypicalAccess))
-        			
-                if(locationDisabled<1 && atypicalAccess.size>0)
-        				populateAtypicalAccessLocation(event).alert()
+                                                    
+                  if(atypicalAccess.size>0) {
+                      val atypicalCitiesNames = atypicalAccess.map({ tuple => tuple._11.replace(" ", "_").trim()+"/"+tuple._9.replace(" ", "_").trim()})
+                      
+                      //println("UserName: "+userName+ " - Atypical access location: "+atypicalCitiesNames.mkString(","))
+      
+              				val flowMap: Map[String,String] = new HashMap[String,String]
+              				flowMap.put("flow:id",System.currentTimeMillis.toString)
+              				val event = new HogEvent(new HogFlow(flowMap,atypicalAccess.head._5,atypicalAccess.head._2))
+                                   
+                      event.data.put("userName", userName) 
+                      event.data.put("atypicalCities", atypicalCitiesNames.mkString(","))          
+              				event.data.put("accessLogs",authTupleToString(atypicalAccess))
+              			
+                      if(locationDisabled<1)
+              				  populateAtypicalAccessLocation(event).alert()
+                  }
         			}
               HogHBaseHistogram.saveHistogram(Histograms.merge(citiesSavedHistogram, new HogHistogram("",totalCities,citiesHistogram,citiesHistogramLabels)))
         }
@@ -355,19 +377,20 @@ object HogAuth {
                                                            ! UAReverseDomainsWhitelist
                                                               .map { domain => tuple._4.endsWith(domain) }
                                                               .contains(true) })
-                
-                println("UserName: "+userName+ " - Atypical access UserAgent: "+atypicalAccess.map(_._8).mkString(","))
-
-                val flowMap: Map[String,String] = new HashMap[String,String]
-                flowMap.put("flow:id",System.currentTimeMillis.toString)
-                val event = new HogEvent(new HogFlow(flowMap,atypicalAccess.head._5,atypicalAccess.head._2))
-                             
-                event.data.put("userName", userName) 
-                event.data.put("atypicalUserAgents", atypicalAccess.map(_._8).mkString(","))          
-                event.data.put("accessLogs",authTupleToString(atypicalAccess))
-                
-                if(UADisabled<1 && atypicalAccess.size>0)
-                populateAtypicalAccessUserAgent(event).alert()
+                if(atypicalAccess.size>0) {
+                    //println("UserName: "+userName+ " - Atypical access UserAgent: "+atypicalAccess.map(_._8).mkString(","))
+    
+                    val flowMap: Map[String,String] = new HashMap[String,String]
+                    flowMap.put("flow:id",System.currentTimeMillis.toString)
+                    val event = new HogEvent(new HogFlow(flowMap,atypicalAccess.head._5,atypicalAccess.head._2))
+                                 
+                    event.data.put("userName", userName) 
+                    event.data.put("atypicalUserAgents", atypicalAccess.map(_._8).mkString(","))          
+                    event.data.put("accessLogs",authTupleToString(atypicalAccess))
+                    
+                    if(UADisabled<1)
+                    populateAtypicalAccessUserAgent(event).alert()
+                }
               }
               HogHBaseHistogram.saveHistogram(Histograms.merge(userAgentSavedHistogram, new HogHistogram("",totalUserAgents,userAgentHistogram)))
         }
@@ -386,26 +409,30 @@ object HogAuth {
                                                                    ! systemReverseDomainsWhitelist
                                                                       .map { domain => tuple._4.endsWith(domain) }
                                                                       .contains(true)})
-                
-                println("UserName: "+userName+ " - Atypical access services: "+atypicalServices.mkString(","))
+                if(atypicalAccess.size>0) {
 
-                val flowMap: Map[String,String] = new HashMap[String,String]
-                flowMap.put("flow:id",System.currentTimeMillis.toString)
-                val event = new HogEvent(new HogFlow(flowMap,atypicalAccess.head._5,atypicalAccess.head._2))
-                             
-                event.data.put("userName", userName) 
-                event.data.put("atypicalServices", atypicalServices.mkString(","))          
-                event.data.put("accessLogs",authTupleToString(atypicalAccess))
-                
-                if(serviceDisabled<1 && atypicalAccess.size>0)
-                populateAtypicalAccessService(event).alert()
+                    //println("UserName: "+userName+ " - Atypical access services: "+atypicalServices.mkString(","))
+    
+                    val flowMap: Map[String,String] = new HashMap[String,String]
+                    flowMap.put("flow:id",System.currentTimeMillis.toString)
+                    val event = new HogEvent(new HogFlow(flowMap,atypicalAccess.head._5,atypicalAccess.head._2))
+                                 
+                    event.data.put("userName", userName) 
+                    event.data.put("atypicalServices", atypicalServices.mkString(","))          
+                    event.data.put("accessLogs",authTupleToString(atypicalAccess))
+                    
+                    if(serviceDisabled<1)
+                      populateAtypicalAccessService(event).alert()
+                }
               }
               HogHBaseHistogram.saveHistogram(Histograms.merge(servicesSavedHistogram, new HogHistogram("",totalServices,servicesHistogram)))
         }
 
   }
-    
+
+  return summary1;
   
+
   
   }
 
