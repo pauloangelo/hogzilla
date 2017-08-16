@@ -177,7 +177,16 @@ object HogAuth {
     event
   }
   
-  
+  def locationString(country:String, region:String, city:String):String = {
+    
+      if(city.equals("N/A") || region.equals("N/A"))
+        if(country.equals("N/A"))
+          "location not defined"
+        else
+          country
+      else
+        city+"/"+region+"/"+country
+  }
 
   def authTupleToString(hashSet:HashSet[(Double,String,String,String,String,String,Int,String,String,String,String,String,String)]):String =
 	  {
@@ -194,9 +203,9 @@ object HogAuth {
           loginFailedString="FAILED"
           
           if(clientReverse.equals(""))
-			      c+"\n"+clientIP+" => "+agent+":"+service+"  [Location: "+city+"/"+region+"/"+country+", UA: "+userAgent+", AuthMethod: "+authMethod+", ASN: "+asn+", TIME: "+datePrinted+", "+loginFailedString+"]"
+			      c+"\n"+clientIP+" => "+agent+":"+service+"  [Location: "+locationString(country,region,city)+", UA: "+userAgent+", AuthMethod: "+authMethod+", ASN: "+asn+", TIME: "+datePrinted+", "+loginFailedString+"]"
           else
-            c+"\n"+clientIP+"("+clientReverse+") => "+agent+":"+service+"  [Location: "+city+"/"+region+"/"+country+", UA: "+userAgent+", AuthMethod: "+authMethod+", ASN: "+asn+", TIME: "+datePrinted+", "+loginFailedString+"]"
+            c+"\n"+clientIP+"("+clientReverse+") => "+agent+":"+service+"  [Location: "+locationString(country,region,city)+", UA: "+userAgent+", AuthMethod: "+authMethod+", ASN: "+asn+", TIME: "+datePrinted+", "+loginFailedString+"]"
 		  })
 	  }
   
@@ -249,7 +258,7 @@ object HogAuth {
                                                                  client.os.family+"/"+client.userAgent.family
                                                               } 
                                                             }
-                                      val country        = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("country")))
+                                      val country        = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("country_name"))).replace("Brazil", "Brasil")
                                       val region         = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("region")))
                                       val city           = Bytes.toString(new String(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("city")),"ISO-8859-1").getBytes("UTF-8"))
                                       //val city         = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("city")))
@@ -344,7 +353,10 @@ object HogAuth {
                                                            ! locationExcludedCities.contains(tuple._11)  &&
                                                            ! locationReverseDomainsWhitelist
                                                               .map { domain => tuple._4.endsWith(domain) }
-                                                              .contains(true) 
+                                                              .contains(true) &&
+                                                            ! tuple._11.equals("N/A")&& //city
+                                                            ! tuple._10.equals("N/A")&& //region
+                                                            ! tuple._9.equals("N/A")    // country
                                                     })
                                                     
                   if(atypicalAccess.size>0) {
