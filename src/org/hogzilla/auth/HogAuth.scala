@@ -54,6 +54,8 @@ import java.io.File
 import org.hogzilla.util.HogConfig
 import org.apache.hadoop.hbase.client.Delete
 import org.apache.hadoop.hbase.client.Result
+import java.util.Formatter.DateTime
+import java.text.SimpleDateFormat
 
 
 /**
@@ -185,14 +187,16 @@ object HogAuth {
                                   loginFailed, userAgent, country, region, city, coords, asn)) 
 			  => 
           
+        val datePrinted =(new SimpleDateFormat("HH'h'MM'm' dd/MM/yyyy")).format(generatedTime.toLong*1000) 
+          
         var loginFailedString="SUCCESS"
 		    if(loginFailed>0)
           loginFailedString="FAILED"
           
           if(clientReverse.equals(""))
-			      c+"\n"+clientIP+" => "+agent+":"+service+"  [Location: "+city+"/"+country+", UA: "+userAgent+", AuthMethod: "+authMethod+", ASN: "+asn+", "+loginFailedString+"]"
+			      c+"\n"+clientIP+" => "+agent+":"+service+"  [Location: "+city+"/"+region+"/"+country+", UA: "+userAgent+", AuthMethod: "+authMethod+", ASN: "+asn+", TIME: "+datePrinted+", "+loginFailedString+"]"
           else
-            c+"\n"+clientIP+"("+clientReverse+") => "+agent+":"+service+"  [Location: "+city+"/"+country+", UA: "+userAgent+", AuthMethod: "+authMethod+", ASN: "+asn+", "+loginFailedString+"]"
+            c+"\n"+clientIP+"("+clientReverse+") => "+agent+":"+service+"  [Location: "+city+"/"+region+"/"+country+", UA: "+userAgent+", AuthMethod: "+authMethod+", ASN: "+asn+", TIME: "+datePrinted+", "+loginFailedString+"]"
 		  })
 	  }
   
