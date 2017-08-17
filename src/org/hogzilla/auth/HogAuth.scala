@@ -258,7 +258,7 @@ object HogAuth {
                                                                  client.os.family+"/"+client.userAgent.family
                                                               } 
                                                             }
-                                      val country        = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("country_name"))).replace("Brazil", "Brasil")
+                                      val country        = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("country_name")))
                                       val region         = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("region")))
                                       val city           = Bytes.toString(new String(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("city")),"ISO-8859-1").getBytes("UTF-8"))
                                       //val city         = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("city")))
@@ -270,7 +270,7 @@ object HogAuth {
 
                                       
                                       (generatedTime, agent, service, clientReverse, clientIP, userName, authMethod, 
-                                          loginFailed, clientUA, country, region, city, coords, asn, result)
+                                          loginFailed, clientUA, {if(country!=null) country.replace("Brazil", "Brasil") else country}, region, city, coords, asn, result)
                            }).cache
 
   //println("Counting auth records...")                         
