@@ -121,7 +121,15 @@ object HogHBaseHistogram {
      
       
       HogHBaseRDD.hogzilla_histograms.delete(new Delete(put.getRow))
-      HogHBaseRDD.hogzilla_histograms.put(put)
+      
+      try {
+        HogHBaseRDD.hogzilla_histograms.put(put)
+      } catch {
+        case t: Throwable => t.printStackTrace() 
+        hogHist.histLabels.foreach(println(_))
+        hogHist.histMap.foreach({case (key,map) => println(key+" => "+map.toString)})
+        
+      }
     
   }
   

@@ -196,7 +196,8 @@ object HogAuth {
                                   loginFailed, userAgent, country, region, city, coords, asn)) 
 			  => 
           
-        val datePrinted =(new SimpleDateFormat("HH'h'MM'm' dd/MM/yyyy")).format(generatedTime.toLong*1000) 
+        val datePrinted =(new SimpleDateFormat("dd/MM/yyyy")).format(generatedTime.toLong*1000) 
+        val timePrinted =(new SimpleDateFormat("HH'h'MM'm'")).format(generatedTime.toLong*1000) 
           
         var loginFailedString="SUCCESS"
 		    if(loginFailed>0)
@@ -205,7 +206,7 @@ object HogAuth {
           if(clientReverse.equals(""))
 			      c+"\n"+clientIP+" => "+agent+":"+service+"  [Location: "+locationString(country,region,city)+", UA: "+userAgent+", AuthMethod: "+authMethod+", ASN: "+asn+", TIME: "+datePrinted+", "+loginFailedString+"]"
           else
-            c+"\n"+clientIP+"("+clientReverse+") => "+agent+":"+service+"  [Location: "+locationString(country,region,city)+", UA: "+userAgent+", AuthMethod: "+authMethod+", ASN: "+asn+", TIME: "+datePrinted+", "+loginFailedString+"]"
+            c+"\n"+clientIP+"("+clientReverse+") => "+agent+":"+service+"  [Location: "+locationString(country,region,city)+", UA: "+userAgent+", AuthMethod: "+authMethod+", ASN: "+asn+", DATE: "+datePrinted+", TIME: "+timePrinted+", "+loginFailedString+"]"
 		  })
 	  }
   
@@ -258,7 +259,7 @@ object HogAuth {
                                                                  client.os.family+"/"+client.userAgent.family
                                                               } 
                                                             }
-                                      val country        = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("country_name")))
+                                      val country        = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("country")))
                                       val region         = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("region")))
                                       val city           = Bytes.toString(new String(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("city")),"ISO-8859-1").getBytes("UTF-8"))
                                       //val city         = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("city")))
@@ -270,8 +271,10 @@ object HogAuth {
 
                                       
                                       (generatedTime, agent, service, clientReverse, clientIP, userName, authMethod, 
-                                          loginFailed, clientUA, {if(country!=null) country.replace("Brazil", "Brasil") else country}, region, city, coords, asn, result)
-                           }).cache
+                                          loginFailed, clientUA, country.replace("Brazil","Brasil"), region, city.substring(0, Math.min(city.length(), 20)), coords, asn, result)
+                           }).filter({case (generatedTime, agent, service, clientReverse, clientIP, userName, authMethod, 
+                                          loginFailed, userAgent, country, region, city, coords, asn, result) =>
+                                            coords.length()<20 }).cache
 
   //println("Counting auth records...")                         
   val summary1Count = summary1.count()
