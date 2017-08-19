@@ -113,41 +113,41 @@ object HogSFlow {
   */
    
    ///home/hogzilla/hogzilla/conf/
-   val config = ConfigFactory.parseFile(new File("sflow.conf"))
+   val config = ConfigFactory.parseFile(new File("saflow.conf"))
       
-   val alienThreshold:Int          = HogConfig.getInt (config,"alien.minPairs",20) // number of pairs accessed for a single alien. Alert above it.
-   val SMTPTalkersThreshold:Long   = HogConfig.getLong(config,"SMTPTalkers.minBytes",20971520L) // (20*1024*1024 = 20M)
-   val atypicalTCPPort:Set[String] = HogConfig.getSetString(config,"atypicalPorts.excludePorts",Set("80","443","587","465","993","995"))
-   val AtypicalTCPMinPkts          = HogConfig.getInt (config,"atypicalPorts.minPacketsPerFlow",2)
-   val atypicalPairsThresholdMIN        = HogConfig.getInt (config,"atypicalPairs.minPairs",300) 
-   val atypicalAmountDataThresholdMIN   = HogConfig.getLong(config,"atypicalData.minBytes",5737418240L) //(10*1024*1024*1024 = 5G) 
-   val AtypicalAlienTCPMinPkts            = HogConfig.getInt (config,"atypicalAlienPorts.minPacketsPerFlow",2)
-   val p2pPairsThreshold                = HogConfig.getInt (config,"p2p.minPairs",5)
-   val p2pMyPortsThreshold              = HogConfig.getInt (config,"p2p.minPorts",4)
-   val abusedSMTPBytesThreshold         = HogConfig.getLong(config,"abusedSMTP.minBytes",50000000L)//config.getString("abusedSMTPBytesThreshold").toLong // ~50 MB
-   val p2pBytes2ndMethodThreshold       = HogConfig.getLong(config,"p2p.minBytes2nd",10000000L) // ~10 MB
-   val p2pPairs2ndMethodThreshold       = HogConfig.getInt (config,"p2p.minPairs2nd",10)
-   val p2pDistinctPorts2ndMethodThreshold           = HogConfig.getInt (config,"p2p.minPorts2nd",10)
-   val mediaClientCommunicationDurationThreshold    = HogConfig.getInt (config,"mediaStreaming.minDuration",300) // 5min (300s)
+   val alienThreshold:Int                          = HogConfig.getInt (config,"alien.minPairs",20) // number of pairs accessed for a single alien. Alert above it.
+   val SMTPTalkersThreshold:Long                   = HogConfig.getLong(config,"SMTPTalkers.minBytes",20971520L) // (20*1024*1024 = 20M)
+   val atypicalTCPPort:Set[String]                 = HogConfig.getSetString(config,"atypicalPorts.excludePorts",Set("80","443","587","465","993","995"))
+   val AtypicalTCPMinPkts                          = HogConfig.getInt (config,"atypicalPorts.minPacketsPerFlow",2)
+   val atypicalPairsThresholdMIN                   = HogConfig.getInt (config,"atypicalPairs.minPairs",300) 
+   val atypicalAmountDataThresholdMIN              = HogConfig.getLong(config,"atypicalData.minBytes",5737418240L) //(10*1024*1024*1024 = 5G) 
+   val AtypicalAlienTCPMinPkts                     = HogConfig.getInt (config,"atypicalAlienPorts.minPacketsPerFlow",2)
+   val p2pPairsThreshold                           = HogConfig.getInt (config,"p2p.minPairs",5)
+   val p2pMyPortsThreshold                         = HogConfig.getInt (config,"p2p.minPorts",4)
+   val abusedSMTPBytesThreshold                    = HogConfig.getLong(config,"abusedSMTP.minBytes",50000000L)//config.getString("abusedSMTPBytesThreshold").toLong // ~50 MB
+   val p2pBytes2ndMethodThreshold                  = HogConfig.getLong(config,"p2p.minBytes2nd",10000000L) // ~10 MB
+   val p2pPairs2ndMethodThreshold                  = HogConfig.getInt (config,"p2p.minPairs2nd",10)
+   val p2pDistinctPorts2ndMethodThreshold          = HogConfig.getInt (config,"p2p.minPorts2nd",10)
+   val mediaClientCommunicationDurationThreshold   = HogConfig.getInt (config,"mediaStreaming.minDuration",300) // 5min (300s)
    val mediaClientCommunicationDurationMAXThreshold = HogConfig.getInt (config,"mediaStreaming.maxDuration",7200) // 2h 7200
-   val mediaClientPairsThreshold                    = p2pPairs2ndMethodThreshold
-   val mediaClientUploadThreshold         = HogConfig.getLong(config,"mediaStreaming.maxUploadBytes",10000000L) // ~10MB
-   val mediaClientDownloadThreshold       = HogConfig.getLong(config,"mediaStreaming.minDownloadBytes",1000000L) // 1MB
-   val mediaClientExcludedPorts           = HogConfig.getSetString(config,"mediaStreaming.excludePorts",Set("1194")) 
-   val dnsTunnelThreshold                 = HogConfig.getLong(config,"dnsTunnel.minBytes",50000000L) // ~50 MB
-   val bigProviderThreshold               = HogConfig.getLong(config,"bigProviders.minBytes",1073741824L) // (1*1024*1024*1024 = 1G)
-   val icmpTunnelThreshold                = HogConfig.getInt (config,"ICMPTunnel.minPacket",200) // 200b
-   val icmpTotalTunnelThreshold           = HogConfig.getLong(config,"ICMPTunnel.minBytes",100000000L) // ~100MB 
-   val hPortScanMinFlowsThreshold         = HogConfig.getInt (config,"hPortScan.minFlows",100)
-   val hPortScanExceptionPorts            = HogConfig.getSetString(config,"hPortScan.excludeAlienPorts",Set("80","443","53"))
-   val hPortScanExceptionInternalPorts    = HogConfig.getSetString(config,"hPortScan.excludeMyPorts",Set("123"))
-   val vPortScanMinPortsThreshold         = HogConfig.getInt (config,"vPortScan.minPorts",3)
-   val vPortScanPortIntervalThreshold     = HogConfig.getInt (config,"vPortScan.maxPortNumber",1024) // 1 to 1023
-   val ddosMinConnectionsThreshold        = HogConfig.getInt (config,"DDoS.minFlows",50) // Over this, can be considered
-   val ddosMinPairsThreshold              = HogConfig.getInt (config,"DDoS.minPairs",20)
-   val ddosExceptionAlienPorts:Set[String]= HogConfig.getSetString(config,"hPortScan.excludeAlienPorts",Set("80","443","587","465","993","995")) 
-   val FlowListLimit                      = HogConfig.getInt (config,"alert.maxFlowList",1000)
-   val CCminPktsPerFlow                   = HogConfig.getInt (config,"BotNet.minPktsPerFlow",20)
+   val mediaClientPairsThreshold                   = p2pPairs2ndMethodThreshold
+   val mediaClientUploadThreshold                  = HogConfig.getLong(config,"mediaStreaming.maxUploadBytes",10000000L) // ~10MB
+   val mediaClientDownloadThreshold                = HogConfig.getLong(config,"mediaStreaming.minDownloadBytes",1000000L) // 1MB
+   val mediaClientExcludedPorts                    = HogConfig.getSetString(config,"mediaStreaming.excludePorts",Set("1194")) 
+   val dnsTunnelThreshold                          = HogConfig.getLong(config,"dnsTunnel.minBytes",50000000L) // ~50 MB
+   val bigProviderThreshold                        = HogConfig.getLong(config,"bigProviders.minBytes",1073741824L) // (1*1024*1024*1024 = 1G)
+   val icmpTunnelThreshold                         = HogConfig.getInt (config,"ICMPTunnel.minPacket",200) // 200b
+   val icmpTotalTunnelThreshold                    = HogConfig.getLong(config,"ICMPTunnel.minBytes",100000000L) // ~100MB 
+   val hPortScanMinFlowsThreshold                  = HogConfig.getInt (config,"hPortScan.minFlows",100)
+   val hPortScanExceptionPorts                     = HogConfig.getSetString(config,"hPortScan.excludeAlienPorts",Set("80","443","53"))
+   val hPortScanExceptionInternalPorts             = HogConfig.getSetString(config,"hPortScan.excludeMyPorts",Set("123"))
+   val vPortScanMinPortsThreshold                  = HogConfig.getInt (config,"vPortScan.minPorts",3)
+   val vPortScanPortIntervalThreshold              = HogConfig.getInt (config,"vPortScan.maxPortNumber",1024) // 1 to 1023
+   val ddosMinConnectionsThreshold                 = HogConfig.getInt (config,"DDoS.minFlows",50) // Over this, can be considered
+   val ddosMinPairsThreshold                       = HogConfig.getInt (config,"DDoS.minPairs",20)
+   val ddosExceptionAlienPorts:Set[String]         = HogConfig.getSetString(config,"hPortScan.excludeAlienPorts",Set("80","443","587","465","993","995")) 
+   val FlowListLimit                               = HogConfig.getInt (config,"alert.maxFlowList",1000)
+   val CCminPktsPerFlow                            = HogConfig.getInt (config,"BotNet.minPktsPerFlow",20)
   
    
    val disable_abusedSMTP          = HogConfig.getInt(config,"abusedSMTP.disabled",0)
@@ -167,6 +167,25 @@ object HogSFlow {
    val disable_SMTPTalkers         = HogConfig.getInt(config,"SMTPTalkers.disabled",0)
    val disable_topTalkers          = HogConfig.getInt(config,"topTalkers.disabled",0)
    val disable_vPortScan           = HogConfig.getInt(config,"vPortScan.disabled",0)
+   
+   val generalExcludedIPs            = HogConfig.getSetString(config,"general.excludeIPs",Set())
+   val abusedSMTPExcludedIPs         = HogConfig.getSetString(config,"abusedSMTP.excludeIPs",Set())++generalExcludedIPs
+   val alienExcludedIPs              = HogConfig.getSetString(config,"alien.excludeIPs",Set())++generalExcludedIPs
+   val atypicalAlienPortsExcludedIPs = HogConfig.getSetString(config,"atypicalAlienPorts.excludeIPs",Set())++generalExcludedIPs
+   val atypicalDataExcludedIPs       = HogConfig.getSetString(config,"atypicalData.excludeIPs",Set())++generalExcludedIPs
+   val atypicalPairsExcludedIPs      = HogConfig.getSetString(config,"atypicalPairs.excludeIPs",Set())++generalExcludedIPs
+   val atypicalPortsExcludedIPs      = HogConfig.getSetString(config,"atypicalPorts.excludeIPs",Set())++generalExcludedIPs
+   val BotNetExcludedIPs             = HogConfig.getSetString(config,"BotNet.excludeIPs",Set())++generalExcludedIPs
+   val DDoSExcludedIPs               = HogConfig.getSetString(config,"DDoS.excludeIPs",Set())++generalExcludedIPs
+   val dnsTunnelExcludedIPs          = HogConfig.getSetString(config,"dnsTunnel.excludeIPs",Set())++generalExcludedIPs
+   val hPortScanExcludedIPs          = HogConfig.getSetString(config,"hPortScan.excludeIPs",Set())++generalExcludedIPs
+   val ICMPTunnelExcludedIPs         = HogConfig.getSetString(config,"ICMPTunnel.excludeIPs",Set())++generalExcludedIPs
+   val mediaStreamingExcludedIPs     = HogConfig.getSetString(config,"mediaStreaming.excludeIPs",Set())++generalExcludedIPs
+   val p2pExcludedIPs                = HogConfig.getSetString(config,"p2p.excludeIPs",Set())++generalExcludedIPs
+   val SMTPTalkersExcludedIPs        = HogConfig.getSetString(config,"SMTPTalkers.excludeIPs",Set())++generalExcludedIPs
+   val topTalkersExcludedIPs         = HogConfig.getSetString(config,"topTalkers.excludeIPs",Set())++generalExcludedIPs
+   val vPortScanExcludedIPs          = HogConfig.getSetString(config,"vPortScan.excludeIPs",Set())++generalExcludedIPs
+   val UDPAmplifierExcludedIPs       = HogConfig.getSetString(config,"UDPAmplifier.excludeIPs",Set())++generalExcludedIPs
 
   // val topTalkersThreshold:Long    = HogConfig.getLong(config,"topTalkers.threshold",21474836480L) // (20*1024*1024*1024 = 20G)
    //val mediaClientDownloadThreshold = 10000000L // ~10MB
@@ -1020,7 +1039,9 @@ object HogSFlow {
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
                   =>  alienPort.equals("25") &  
                       numberPkts>3 &
-                      !isMyIP(alienIP,myNets) // Exclude internal communication
+                      !isMyIP(alienIP,myNets) & // Exclude internal communication
+                      !SMTPTalkersExcludedIPs.contains(myIP) &
+                      !SMTPTalkersExcludedIPs.contains(alienIP) 
            })
     .map({
            case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
@@ -1053,7 +1074,7 @@ object HogSFlow {
                        !Histograms.isTypicalEvent(savedLastHogHistogram.histMap, "25")// Exclude SMTP servers
                      } &
                      { val savedLastHogHistogram2=HogHBaseHistogram.getHistogram("HIST02-"+myIP)
-                       !Histograms.isTypicalEvent(savedLastHogHistogram2.histMap, "25")// Exclude if send before
+                       !Histograms.isTypicalEvent(savedLastHogHistogram2.histMap, "25")// Exclude if sent before
                      }
                    }
           })
@@ -1133,7 +1154,9 @@ object HogSFlow {
   .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
                   =>  myPort.toInt > 10000 &
                       alienPort.toInt > 10000 &
-                      numberPkts > 1
+                      numberPkts > 1 &
+                      !p2pExcludedIPs.contains(myIP) &
+                      !p2pExcludedIPs.contains(alienIP) 
          })
   .map({
       case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
@@ -1202,7 +1225,9 @@ object HogSFlow {
                       myPort.toInt > 1000     &
                       alienPort.toInt < 10000 &
                       alienPort.toInt > 1000  &
-                      numberPkts > 1
+                      numberPkts > 1&
+                      !p2pExcludedIPs.contains(myIP) &
+                      !p2pExcludedIPs.contains(alienIP) 
            })
     .map({
       case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
@@ -1277,7 +1302,9 @@ object HogSFlow {
                       alienPort.toInt > 1000   &
                       numberPkts > 1           &
                       !myPort.equals("1194")   &
-                      !alienPort.equals("1194") 
+                      !alienPort.equals("1194") &
+                      !mediaStreamingExcludedIPs.contains(myIP) &
+                      !mediaStreamingExcludedIPs.contains(alienIP) 
            })
     .map({
       case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
@@ -1361,7 +1388,9 @@ object HogSFlow {
                       numberPkts >= AtypicalTCPMinPkts  &  
                       //bytesUp > 0 &
                       //bytesDown > 0 &
-                      status > 0 // PSH-ACK or SYN-ACK flags or ACK from MyHost 
+                      status > 0 & // PSH-ACK or SYN-ACK flags or ACK from MyHost 
+                      !atypicalPortsExcludedIPs.contains(myIP) &
+                      !atypicalPortsExcludedIPs.contains(alienIP) 
            })
     .map({
       case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
@@ -1529,7 +1558,9 @@ if(disable_atypicalAlienPorts<=1)
                       !isMyIP(alienIP,myNets)  &
                       !ftpTalkers.contains((myIP,alienIP)) &// Avoid FTP communication
                       proto.equals("TCP") &
-                      status > 0
+                      status > 0 &
+                      !atypicalAlienPortsExcludedIPs.contains(myIP) &
+                      !atypicalAlienPortsExcludedIPs.contains(alienIP) 
            })         
     .map({
       case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
@@ -1711,7 +1742,9 @@ if(disable_atypicalAlienPorts<=1)
   val atypicalNumberPairsCollection: PairRDDFunctions[(String,String), (Long,Long,Long,HashSet[(String,String,String,String,String,Long,Long,Long,Int,Long,Long,Long,Int)],Long,Long)] = 
     sflowSummary
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
-                  =>  numberPkts > 1
+                  =>  numberPkts > 1 &
+                      !atypicalPairsExcludedIPs.contains(myIP) &
+                      !atypicalPairsExcludedIPs.contains(alienIP) 
            })
     .map({
       case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
@@ -1815,7 +1848,9 @@ if(disable_atypicalAlienPorts<=1)
                       myPort.toLong > 1024 &
                       !myPort.equals("8080") &
                       !isMyIP(alienIP,myNets) & // Exclude internal communication
-                      !isMyIP(alienIP,bigProviderNets) // Exclude bigProviders
+                      !isMyIP(alienIP,bigProviderNets) &// Exclude bigProviders
+                      !atypicalDataExcludedIPs.contains(myIP) &
+                      !atypicalDataExcludedIPs.contains(alienIP) 
            })
     .map({
           case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
@@ -1921,7 +1956,7 @@ if(disable_atypicalAlienPorts<=1)
                       proto.equals("TCP") &
                       !isMyIP(alienIP,myNets) &  // Flow InternalIP <-> ExternalIP
                       !p2pTalkers.contains(myIP) & // Avoid P2P communication
-                      !ftpTalkers.contains((myIP,alienIP)) 
+                      !ftpTalkers.contains((myIP,alienIP))  
            })
     .map({
       case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
@@ -2051,7 +2086,9 @@ if(disable_atypicalAlienPorts<=1)
     sflowSummary
     .filter({ case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
                  => direction < 0  &
-                    !isMyIP(alienIP,myNets)
+                    !isMyIP(alienIP,myNets)&
+                    !alienExcludedIPs.contains(myIP) &
+                    !alienExcludedIPs.contains(alienIP) 
             })
     .map({
       case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
@@ -2124,8 +2161,10 @@ if(disable_atypicalAlienPorts<=1)
                         myPort.equals("1900")
                       ) &
                       proto.equals("UDP")      &
-                      bytesUp/numberPkts >250   &
-                      !isMyIP(alienIP,myNets)                      
+                      bytesUp/numberPkts > 250   &
+                      !isMyIP(alienIP,myNets)  &
+                    !UDPAmplifierExcludedIPs.contains(myIP) &
+                    !UDPAmplifierExcludedIPs.contains(alienIP)                     
            })
     .map({
           case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
@@ -2181,7 +2220,10 @@ if(disable_atypicalAlienPorts<=1)
                         myPort.equals("587")
                       ) &
                       proto.equals("TCP")  &
-                      !isMyIP(alienIP,myNets) 
+                      !isMyIP(alienIP,myNets) &
+                    !abusedSMTPExcludedIPs.contains(myIP) &
+                    !abusedSMTPExcludedIPs.contains(alienIP) 
+                      
            })
     .map({
           case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
@@ -2240,7 +2282,9 @@ if(disable_atypicalAlienPorts<=1)
                       alienPort.equals("53") &
                       proto.equals("UDP")  &
                       (bytesUp+bytesDown)*sampleRate > dnsTunnelThreshold &
-                      !isMyIP(alienIP,myNets) 
+                      !isMyIP(alienIP,myNets) &
+                    !dnsTunnelExcludedIPs.contains(myIP) &
+                    !dnsTunnelExcludedIPs.contains(alienIP) 
            })
     .map({
           case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
@@ -2295,7 +2339,9 @@ if(disable_atypicalAlienPorts<=1)
   sflowSummaryICMP
   .filter({case ((srcIP,icmpType,dstIP,icmpCode, proto ),(bytesUp,bytesDown,numberOfPkts,direction,beginTime,endTime,sampleRate)) 
                   =>  
-                      (bytesUp+bytesDown)/numberOfPkts > icmpTunnelThreshold
+                      (bytesUp+bytesDown)/numberOfPkts > icmpTunnelThreshold &
+                    !ICMPTunnelExcludedIPs.contains(srcIP) &
+                    !ICMPTunnelExcludedIPs.contains(dstIP) 
            })
     .map({
           case ((srcIP,icmpType,dstIP,icmpCode, proto ),(bytesUp,bytesDown,numberOfPkts,direction,beginTime,endTime,sampleRate)) =>
@@ -2357,7 +2403,9 @@ if(disable_atypicalAlienPorts<=1)
                   => !hPortScanExceptionPorts.contains(alienPort)  & // Avoid common ports
                      (   !isMyIP(alienIP, myNets) ||
                          !hPortScanExceptionInternalPorts.contains(alienPort) ) &
-                     numberPkts < 5 // few pkts per flow
+                     numberPkts < 5 &// few pkts per flow
+                    !hPortScanExcludedIPs.contains(myIP) &
+                    !hPortScanExcludedIPs.contains(alienIP) 
            })
     .map({
       case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
@@ -2500,7 +2548,9 @@ if(disable_atypicalAlienPorts<=1)
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
                   => alienPort.toLong < vPortScanPortIntervalThreshold  &
                      myPort.toLong > 1023 &
-                     numberPkts < 5 // few pkts per flow
+                     numberPkts < 5 & // few pkts per flow
+                    !vPortScanExcludedIPs.contains(myIP) &
+                    !vPortScanExcludedIPs.contains(alienIP)
            })
     .map({
       case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
@@ -2609,7 +2659,9 @@ if(disable_atypicalAlienPorts<=1)
     .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
                   => !isMyIP(alienIP, myNets) &
                      !ddosExceptionAlienPorts.contains(alienPort) &
-                     direction < 1
+                     direction < 1 &
+                    !DDoSExcludedIPs.contains(myIP) &
+                    !DDoSExcludedIPs.contains(alienIP)
            })
     .map({
       case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>
@@ -2664,7 +2716,8 @@ if(disable_atypicalAlienPorts<=1)
                  false
           }else
           {false}
-        }
+        } &bytesDown>bytesUp
+        
     })
   .map({case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,sampleRate)) =>
            (myIP,(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,1L,sampleRate))
@@ -2733,7 +2786,9 @@ if(disable_atypicalAlienPorts<=1)
   .filter({case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) 
                   =>  myPort.toLong > 1023 &
                       numberPkts.toLong >= CCminPktsPerFlow &
-                      ccBotNets.contains(alienIP)
+                      ccBotNets.contains(alienIP)   & 
+                    !BotNetExcludedIPs.contains(myIP) &
+                    !BotNetExcludedIPs.contains(alienIP)
            })
     .map({
           case ((myIP,myPort,alienIP,alienPort,proto),(bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status)) =>

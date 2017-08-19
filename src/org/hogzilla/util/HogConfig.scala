@@ -60,6 +60,9 @@ object HogConfig {
           val patternSet="Set\\(".r
           val patternSetEnd="\\)".r
           
+          if(value.equals("Set()"))
+            return Set()
+          
           return (patternSetEnd replaceAllIn((patternSet replaceAllIn(value, "")),""))
                   .split(",").map({x => x.toInt}).toSet
         }
@@ -67,6 +70,9 @@ object HogConfig {
         {
           val patternSet="Set\\(".r
           val patternSetEnd="\\)".r
+          
+          if(value.equals("Set()"))
+            return Set()
           
           return (patternSetEnd replaceAllIn((patternSet replaceAllIn(value, "")),""))
                   .split(",").map({x => println(x.toString.trim()) ; x.toString.trim()}).toSet

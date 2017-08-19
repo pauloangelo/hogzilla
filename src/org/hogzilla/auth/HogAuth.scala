@@ -204,7 +204,7 @@ object HogAuth {
           loginFailedString="FAILED"
           
           if(clientReverse.equals(""))
-			      c+"\n"+clientIP+" => "+agent+":"+service+"  [Location: "+locationString(country,region,city)+", UA: "+userAgent+", AuthMethod: "+authMethod+", ASN: "+asn+", TIME: "+datePrinted+", "+loginFailedString+"]"
+			      c+"\n"+clientIP+" => "+agent+":"+service+"  [Location: "+locationString(country,region,city)+", UA: "+userAgent+", AuthMethod: "+authMethod+", ASN: "+asn+", DATE: "+datePrinted+", TIME: "+timePrinted+", "+loginFailedString+"]"
           else
             c+"\n"+clientIP+"("+clientReverse+") => "+agent+":"+service+"  [Location: "+locationString(country,region,city)+", UA: "+userAgent+", AuthMethod: "+authMethod+", ASN: "+asn+", DATE: "+datePrinted+", TIME: "+timePrinted+", "+loginFailedString+"]"
 		  })
