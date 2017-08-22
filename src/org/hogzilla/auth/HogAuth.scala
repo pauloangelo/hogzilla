@@ -274,7 +274,7 @@ object HogAuth {
                                           loginFailed, clientUA, country.replace("Brazil","Brasil"), region, city.substring(0, Math.min(city.length(), 20)), coords, asn, result)
                            }).filter({case (generatedTime, agent, service, clientReverse, clientIP, userName, authMethod, 
                                           loginFailed, userAgent, country, region, city, coords, asn, result) =>
-                                            coords.length()<20 }).cache
+                                            coords.length()<30 }).cache
 
   //println("Counting auth records...")                         
   val summary1Count = summary1.count()
