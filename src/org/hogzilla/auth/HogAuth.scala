@@ -197,7 +197,7 @@ object HogAuth {
 			  => 
           
         val datePrinted =(new SimpleDateFormat("dd/MM/yyyy")).format(generatedTime.toLong*1000) 
-        val timePrinted =(new SimpleDateFormat("HH'h'MM'm'")).format(generatedTime.toLong*1000) 
+        val timePrinted =(new SimpleDateFormat("HH'h'mm'm'")).format(generatedTime.toLong*1000) 
           
         var loginFailedString="SUCCESS"
 		    if(loginFailed>0)
@@ -274,7 +274,8 @@ object HogAuth {
                                           loginFailed, clientUA, country.replace("Brazil","Brasil"), region, city.substring(0, Math.min(city.length(), 20)), coords, asn, result)
                            }).filter({case (generatedTime, agent, service, clientReverse, clientIP, userName, authMethod, 
                                           loginFailed, userAgent, country, region, city, coords, asn, result) =>
-                                            coords.length()<30 }).cache
+                                            coords.length()<30 &&
+                                            userName.length>0 }).cache
 
   //println("Counting auth records...")                         
   val summary1Count = summary1.count()
@@ -359,7 +360,10 @@ object HogAuth {
                                                               .contains(true) &&
                                                             ! tuple._11.equals("N/A")&& //city
                                                             ! tuple._10.equals("N/A")&& //region
-                                                            ! tuple._9.equals("N/A")    // country
+                                                            ! tuple._9.equals("N/A") &&   // country
+                                                            ! tuple._11.equals(" ")&& //city
+                                                            ! tuple._10.equals(" ")&& //region
+                                                            ! tuple._9.equals(" ")    // country
                                                     })
                                                     
                   if(atypicalAccess.size>0) {
@@ -373,7 +377,8 @@ object HogAuth {
                                    
                       event.data.put("userName", userName) 
                       event.data.put("atypicalCities", atypicalCitiesNames.mkString(","))          
-              				event.data.put("accessLogs",authTupleToString(atypicalAccess))
+              				event.data.put("accessLogs",authTupleToString(atypicalAccess))          
+                      event.data.put("coords",atypicalAccess.map(_._12).head)
               			
                       if(locationDisabled<1)
               				  populateAtypicalAccessLocation(event).alert()
@@ -405,7 +410,8 @@ object HogAuth {
                                  
                     event.data.put("userName", userName) 
                     event.data.put("atypicalUserAgents", atypicalAccess.map(_._8).mkString(","))          
-                    event.data.put("accessLogs",authTupleToString(atypicalAccess))
+                    event.data.put("accessLogs",authTupleToString(atypicalAccess))    
+                    event.data.put("coords",atypicalAccess.map(_._12).head)
                     
                     if(UADisabled<1)
                     populateAtypicalAccessUserAgent(event).alert()
@@ -438,7 +444,8 @@ object HogAuth {
                                  
                     event.data.put("userName", userName) 
                     event.data.put("atypicalServices", atypicalServices.mkString(","))          
-                    event.data.put("accessLogs",authTupleToString(atypicalAccess))
+                    event.data.put("accessLogs",authTupleToString(atypicalAccess))    
+                    event.data.put("coords",atypicalAccess.map(_._12).head)
                     
                     if(serviceDisabled<1)
                       populateAtypicalAccessService(event).alert()

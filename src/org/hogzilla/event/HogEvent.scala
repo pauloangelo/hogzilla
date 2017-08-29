@@ -38,6 +38,7 @@ class HogEvent(flow:HogFlow)
   var ports:String=""
   var title:String=""
   var username:String=""
+  var coords:String=""
  
   
   def formatIPtoBytes(ip:String):Array[Byte] =
@@ -72,6 +73,8 @@ class HogEvent(flow:HogFlow)
      
      if(!username.equals(""))
        put.add(Bytes.toBytes("event"), Bytes.toBytes("username"), Bytes.toBytes(username))
+     if(!coords.equals(""))
+       put.add(Bytes.toBytes("event"), Bytes.toBytes("coords"), Bytes.toBytes(coords))
      
      HogHBaseRDD.hogzilla_events.put(put)
 

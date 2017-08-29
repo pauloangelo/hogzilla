@@ -54,7 +54,6 @@ object HogzillaContinuous {
       //i=i+1
     	val HogRDDAuth = HogHBaseRDD.connectAuth(spark)
     	val summary = HogAuth.runDeleting(HogRDDAuth,spark)
-      //println(f"XXXX Finished iteration $i")
       Thread.sleep(10000) // 10s
     }
     

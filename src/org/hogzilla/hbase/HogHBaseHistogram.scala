@@ -34,6 +34,7 @@ import org.apache.hadoop.hbase.util.Bytes
 import org.apache.spark.SparkContext
 import org.hogzilla.histogram.HogHistogram
 import org.hogzilla.histogram.Histograms
+import org.apache.commons.lang3.StringUtils
 
 
 
@@ -116,7 +117,7 @@ object HogHBaseHistogram {
                                            0 }
       if(mapLabels!=null)
       mapLabels./:(0){ case (ac,(key,label)) =>
-                                put.add(Bytes.toBytes("labels"), Bytes.toBytes(key), Bytes.toBytes(label))
+                                put.add(Bytes.toBytes("labels"), Bytes.toBytes(key), Bytes.toBytes(StringUtils.stripAccents(label).take(50)))
                                            0 }
      
       
