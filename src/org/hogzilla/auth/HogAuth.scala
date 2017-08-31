@@ -66,7 +66,8 @@ object HogAuth {
                                                                                           
   val signature = (HogSignature(3,"HZ/Auth: Atypical access location" ,                2,1,826001201,826).saveHBase(), //1
                    HogSignature(3,"HZ/Auth: Atypical access user-agent" ,              2,1,826001202,826).saveHBase(), //2
-                   HogSignature(3,"HZ/Auth: Atypical access service or system" ,                  2,1,826001203,826).saveHBase()) //3
+                   HogSignature(3,"HZ/Auth: Atypical access service or system" ,       2,1,826001203,826).saveHBase(), //3
+                   HogSignature(3,"HZ/Auth: Atypical user access" ,                    2,1,826001204,826).saveHBase()) //4
                 
    val config = ConfigFactory.parseFile(new File("auth.conf"))
                 
@@ -128,6 +129,7 @@ object HogAuth {
     val userName:String = event.data.get("userName")
     val atypicalCities:String = event.data.get("atypicalCities")
     val accessLogs:String = event.data.get("accessLogs")
+    val coords:String = event.data.get("coords")
     
     event.title = f"HZ/Auth: Atypical access location ($atypicalCities) for user $userName"
     
@@ -137,7 +139,8 @@ object HogAuth {
                   "Atypical access logs:\n"+accessLogs
                   
     event.signature_id = signature._1.signature_id   
-    event.username = userName
+    event.username = userName   
+    event.coords = coords
     event
   }
   
@@ -146,6 +149,7 @@ object HogAuth {
     val userName:String = event.data.get("userName")
     val atypicalUserAgents:String = event.data.get("atypicalUserAgents")
     val accessLogs:String = event.data.get("accessLogs")
+    val coords:String = event.data.get("coords")
     
     event.title = f"HZ/Auth: Atypical access UserAgent ($atypicalUserAgents) for user $userName"
     
@@ -155,7 +159,8 @@ object HogAuth {
                   "Atypical access logs:\n"+accessLogs
                   
     event.signature_id = signature._2.signature_id   
-    event.username = userName    
+    event.username = userName  
+    event.coords = coords  
     event
   }
   
@@ -164,6 +169,7 @@ object HogAuth {
     val userName:String = event.data.get("userName")
     val atypicalServices:String = event.data.get("atypicalServices")
     val accessLogs:String = event.data.get("accessLogs")
+    val coords:String = event.data.get("coords")
     
     event.title = f"HZ/Auth: Atypical access Service ($atypicalServices) for user $userName"
     
@@ -173,14 +179,44 @@ object HogAuth {
                   "Atypical access logs:\n"+accessLogs
                   
     event.signature_id = signature._3.signature_id  
-    event.username = userName     
+    event.username = userName   
+    event.coords = coords  
+    event
+  }
+  
+  
+  
+  def populateAtypicalUserAccess(event:HogEvent):HogEvent = {           
+    val userName:String = event.data.get("userName")
+    val atypicalServices:String = event.data.get("atypicalServices")
+    val atypicalCities:String = event.data.get("atypicalCities")
+    val atypicalUserAgents:String = event.data.get("atypicalUserAgents")
+    val accessLogs:String = event.data.get("accessLogs")
+    val atypicalVars:String = event.data.get("atypicalVars")
+    val coords:String = event.data.get("coords")
+    
+    
+  
+    event.title = f"HZ/Auth: Atypical user access for user $userName"
+    
+    event.text =  "There is an access which is unusual for the user profile.\n"+
+                  "Username: "+userName+"\n"+
+                  "Atypical Services: "+atypicalServices+"\n"+
+                  "Atypical Cities: "+atypicalCities+"\n"+
+                  "Atypical UserAgents: "+atypicalUserAgents+"\n"+
+                  "Atypical vars:"+atypicalVars+"\n"+
+                  "Atypical access logs:\n"+accessLogs
+                  
+    event.signature_id = signature._4.signature_id  
+    event.username = userName   
+    event.coords = coords  
     event
   }
   
   def locationString(country:String, region:String, city:String):String = {
     
-      if(city.equals("N/A") || region.equals("N/A"))
-        if(country.equals("N/A"))
+      if(city.equals("N/A") || region.equals("N/A") || city.equals(" ") || region.equals(" "))
+        if(country.equals("N/A")||country.equals(" "))
           "location not defined"
         else
           country
@@ -282,6 +318,123 @@ object HogAuth {
   if(summary1Count.equals(0))
     return summary1;
     
+  summary1.foreach({case (generatedTime, agent, service, clientReverse, clientIP, userName, authMethod, 
+                                          loginFailed, userAgent, country, region, city, coords, asn, result) =>
+        // Atypical Cities
+        val label =  city.replace(" ", "_").trim()+"/"+country.replace(" ", "_").trim()
+        val citiesHistogram:Map[String,Double] = Map((coords,1D))
+        val citiesHistogramLabels:Map[String,String] = Map((coords,label))
+        val citiesSavedHistogram=HogHBaseHistogram.getHistogram("HIST20-"+userName)
+        var atypicalCitiesNames =""
+        var cityEvent=false
+        
+         // Atypical UserAgents
+        val userAgents1:Map[String,Double] = Map((userAgent,1D))
+        val userAgentHistogram:Map[String,Double] = Map((userAgent,1D))
+        val userAgentSavedHistogram=HogHBaseHistogram.getHistogram("HIST21-"+userName)
+        var atypicalUserAgents=""
+        var UAEvent=false
+        
+        // Atypical Server/Service
+        val servicelabel = agent.replace(" ", "_").trim()+"/"+service.replace(" ", "_").trim()
+        val servicesHistogram:Map[String,Double] = Map((servicelabel,1D))
+        val servicesSavedHistogram=HogHBaseHistogram.getHistogram("HIST22-"+userName)
+        var atypicalSystems=""
+        var systemEvent=false
+        
+        // Atypical Cities
+        if(locationDisabled<2) // if not fully disabled
+        if(citiesSavedHistogram.histSize< 10){
+          HogHBaseHistogram.saveHistogram(Histograms.merge(citiesSavedHistogram, new HogHistogram("",1,citiesHistogram,citiesHistogramLabels)))
+        }else{
+              if(Histograms.isAtypicalEvent(citiesSavedHistogram.histMap, coords) &&
+                   ! locationExcludedCities.contains(city)   &&
+                   ! locationReverseDomainsWhitelist
+                       .map { domain => clientReverse.endsWith(domain) }
+                       .contains(true) &&
+                   ! citiesSavedHistogram.histLabels.keySet
+                       .map ({ coords2 => HogGeograph.haversineDistanceFromStrings(coords,coords2) < locationDistanceMinThreshold })
+                       .contains(true) &&
+                   ! city.equals("N/A")&& 
+                   ! region.equals("N/A")&&
+                   ! country.equals("N/A") &&   
+                   ! city.equals(" ")    && 
+                   ! region.equals(" ")  && 
+                   ! country.equals(" ") 
+              ){
+                  val atypicalCitiesNames = city.replace(" ", "_").trim()+"/"+country.replace(" ", "_").trim()
+                  cityEvent = true 
+              }
+              HogHBaseHistogram.saveHistogram(Histograms.merge(citiesSavedHistogram, new HogHistogram("",1,citiesHistogram,citiesHistogramLabels)))
+        }
+        
+        
+        // Atypical UserAgents
+        if(UADisabled<2 && userAgent!=null && !userAgent.isEmpty()) // if not fully disabled
+        if(userAgentSavedHistogram.histSize< 10){
+          HogHBaseHistogram.saveHistogram(Histograms.merge(userAgentSavedHistogram, new HogHistogram("",1,userAgentHistogram)))
+        }else{
+              if(Histograms.isAtypicalEvent(userAgentSavedHistogram.histMap, userAgent) &&
+                   ! UAexcludedCities.contains(city)   &&
+                   ! UAReverseDomainsWhitelist
+                       .map { domain => clientReverse.endsWith(domain) }
+                       .contains(true) 
+              ){
+                  atypicalUserAgents=userAgent
+                  UAEvent = true 
+              }
+              HogHBaseHistogram.saveHistogram(Histograms.merge(userAgentSavedHistogram, new HogHistogram("",1,userAgentHistogram)))
+        }
+        
+        
+        // Atypical Systems
+        if(serviceDisabled<2) // if not fully disabled
+        if(userAgentSavedHistogram.histSize< 10){
+          HogHBaseHistogram.saveHistogram(Histograms.merge(servicesSavedHistogram, new HogHistogram("",1,servicesHistogram)))
+        }else{
+              if(Histograms.isAtypicalEvent(servicesSavedHistogram.histMap, servicelabel) &&
+                   ! systemExcludedCities.contains(city)   &&
+                   ! systemReverseDomainsWhitelist
+                       .map { domain => clientReverse.endsWith(domain) }
+                       .contains(true) 
+              ){
+                  atypicalSystems=agent.trim()+"/"+service.trim()
+                  systemEvent = true 
+              }
+              HogHBaseHistogram.saveHistogram(Histograms.merge(servicesSavedHistogram, new HogHistogram("",1,servicesHistogram)))
+        }
+        
+        
+        
+        if((locationDisabled<1 && cityEvent)||
+            (UADisabled<1 && UAEvent)||
+            (serviceDisabled<1 && systemEvent)){
+            val flowMap: Map[String,String] = new HashMap[String,String]
+            flowMap.put("flow:id",System.currentTimeMillis.toString)
+            val event = new HogEvent(new HogFlow(flowMap,clientIP,agent))
+                         
+            event.data.put("userName", userName) 
+            event.data.put("coords",coords)
+            event.data.put("atypicalCities", atypicalCitiesNames)
+            event.data.put("atypicalUserAgents", atypicalUserAgents)     
+            event.data.put("atypicalServices", atypicalSystems)      
+            event.data.put("atypicalVars", {if(systemEvent) "S" else ""}+{if(UAEvent) "U" else ""}+{if(cityEvent) "C" else ""})               
+
+            event.data.put("accessLogs",authTupleToString(HashSet((generatedTime, agent, service, clientReverse, clientIP, authMethod, 
+                                                                   loginFailed, userAgent, country, region, city, coords, asn))))          
+            
+            populateAtypicalUserAccess(event).alert()
+        }
+        
+  
+  })
+  
+  
+   
+   return summary1
+   
+ /*  
+   
   val summaryUser:PairRDDFunctions[(String),(String,HashSet[(Double,String,String,String,String,String,Int,String,String,String,String,String,String)])] =                     
         summary1
         .map({case (generatedTime, agent, service, clientReverse, clientIP, userName, authMethod, 
@@ -347,7 +500,7 @@ object HogAuth {
                                 })*/
                 
 
-        			if(atypicalCities.size>0 & citiesSavedHistogram.histMap.filter({case (key,value) => value > 0.001D}).size <5)
+        			if(atypicalCities.size>0 & citiesSavedHistogram.histMap.filter({case (key,value) => value > 0.001D}).size <10)
         			{
         				val atypicalAccess = hashSet.filter({case tuple => 
                                                            atypicalCities.contains(tuple._12) &&
@@ -458,7 +611,7 @@ object HogAuth {
 
   return summary1;
   
-
+*/
   
   }
 

@@ -13,7 +13,7 @@ import scala.math.log
 object Histograms {
 
   
-  val atypicalThreshold = 0.000001D
+  val atypicalThreshold = 0.0000001D
   
   def KullbackLiebler(histogram1:Map[String,Double],histogram2:Map[String,Double]):Double = 
   {
@@ -94,12 +94,20 @@ object Histograms {
          
   }
   
+  def isAtypicalEvent(histogram1:Map[String,Double],event:String):Boolean= 
+  {    
+    !isTypicalEvent(histogram1,event)
+  }
+  
   
    def merge(histogram1:HogHistogram,histogram2:HogHistogram):HogHistogram = 
   {
           
     val keys      = histogram1.histMap.keySet ++ histogram2.histMap.keySet
     val keysLabel = histogram1.histLabels.keySet ++ histogram2.histLabels.keySet
+    var div = 1
+    if(histogram1.histSize.toDouble > 1000)
+      div = 2
     
     keys./:(0.0){ case (ac,key) =>
                   val p:Double = { if(histogram1.histMap.get(key).isEmpty) 0 else histogram1.histMap.get(key).get }
@@ -108,10 +116,10 @@ object Histograms {
                   if(p>0 || q>0)
                   {
                 	  val newp = (
-                			  p*histogram1.histSize.toDouble+
+                			  p*histogram1.histSize.toDouble/div+
                 			  q*histogram2.histSize.toDouble
 
-                			  )/(histogram1.histSize.toDouble+histogram2.histSize.toDouble)
+                			  )/(histogram1.histSize.toDouble/div+histogram2.histSize.toDouble)
 
                 			  histogram1.histMap.put(key,newp)
                   }
@@ -125,7 +133,7 @@ object Histograms {
                         0D
                      }
     
-    val total = histogram1.histSize+histogram2.histSize
+    val total = histogram1.histSize/div+histogram2.histSize
     new HogHistogram(histogram1.histName,total,histogram1.histMap,histogram1.histLabels)
   }
    
