@@ -343,7 +343,7 @@ object HogAuth {
         var systemEvent=false
         
         // Atypical Cities
-        if(locationDisabled<2) // if not fully disabled
+        if(locationDisabled<2 && !city.isEmpty()) // if not fully disabled
         if(citiesSavedHistogram.histSize< 10){
           HogHBaseHistogram.saveHistogram(Histograms.merge(citiesSavedHistogram, new HogHistogram("",1,citiesHistogram,citiesHistogramLabels)))
         }else{
@@ -360,9 +360,12 @@ object HogAuth {
                    ! country.equals("N/A") &&   
                    ! city.equals(" ")    && 
                    ! region.equals(" ")  && 
-                   ! country.equals(" ") 
+                   ! country.equals("") &&   
+                   ! city.equals("")    && 
+                   ! region.equals("")  && 
+                   ! country.equals("") 
               ){
-                  val atypicalCitiesNames = city.replace(" ", "_").trim()+"/"+country.replace(" ", "_").trim()
+                  atypicalCitiesNames = city.trim()+"/"+country.trim()
                   cityEvent = true 
               }
               HogHBaseHistogram.saveHistogram(Histograms.merge(citiesSavedHistogram, new HogHistogram("",1,citiesHistogram,citiesHistogramLabels)))
