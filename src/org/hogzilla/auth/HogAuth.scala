@@ -56,6 +56,7 @@ import org.apache.hadoop.hbase.client.Delete
 import org.apache.hadoop.hbase.client.Result
 import java.util.Formatter.DateTime
 import java.text.SimpleDateFormat
+import org.apache.commons.lang3.StringUtils
 
 
 /**
@@ -295,10 +296,11 @@ object HogAuth {
                                                                  client.os.family+"/"+client.userAgent.family
                                                               } 
                                                             }
-                                      val country        = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("country")))
-                                      val region         = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("region")))
-                                      val city           = Bytes.toString(new String(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("city")),"ISO-8859-1").getBytes("UTF-8"))
+                                      val country        = StringUtils.stripAccents(Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("country"))))
+                                      val region         = StringUtils.stripAccents(Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("region"))))
+                                      //val city           = Bytes.toString(new String(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("city")),"ISO-8859-1").getBytes("UTF-8"))
                                       //val city         = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("city")))
+                                      val city           = StringUtils.stripAccents(Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("city"))))
                                       val coords         = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("coords")))
                                       val asn            = Bytes.toString(result.getValue(Bytes.toBytes("auth"), Bytes.toBytes("asn")))
                                       

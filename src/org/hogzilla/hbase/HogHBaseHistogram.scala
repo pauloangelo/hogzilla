@@ -127,6 +127,7 @@ object HogHBaseHistogram {
         HogHBaseRDD.hogzilla_histograms.put(put)
       } catch {
         case t: Throwable => t.printStackTrace() 
+        println(hogHist.histName)
         hogHist.histLabels.foreach(println(_))
         hogHist.histMap.foreach({case (key,map) => println(key+" => "+map.toString)})
         

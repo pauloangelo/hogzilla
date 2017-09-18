@@ -105,7 +105,7 @@ object Histograms {
           
     val keys      = histogram1.histMap.keySet ++ histogram2.histMap.keySet
     val keysLabel = histogram1.histLabels.keySet ++ histogram2.histLabels.keySet
-    var div = 1
+    var div:Double = 1
     if(histogram1.histSize.toDouble > 1000)
       div = 2
     
@@ -134,7 +134,7 @@ object Histograms {
                      }
     
     val total = histogram1.histSize/div+histogram2.histSize
-    new HogHistogram(histogram1.histName,total,histogram1.histMap,histogram1.histLabels)
+    new HogHistogram(histogram1.histName,total.toInt,histogram1.histMap,histogram1.histLabels)
   }
    
   // It is not exactly a histogram, but... 
