@@ -81,7 +81,7 @@ object HogConfig {
           default // Create type first
           
       } catch {
-        case t: Throwable =>//t.printStackTrace() 
+        case t: Throwable => t.printStackTrace() 
         println(f"Problem parsing $key . Check if it is ok. Using default value")
         
         return default

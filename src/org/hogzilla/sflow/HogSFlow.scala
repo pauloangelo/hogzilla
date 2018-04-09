@@ -113,7 +113,7 @@ object HogSFlow {
   */
    
    ///home/hogzilla/hogzilla/conf/
-   val config = ConfigFactory.parseFile(new File("saflow.conf"))
+   val config = ConfigFactory.parseFile(new File("sflow.conf"))
       
    val alienThreshold:Int                          = HogConfig.getInt (config,"alien.minPairs",20) // number of pairs accessed for a single alien. Alert above it.
    val SMTPTalkersThreshold:Long                   = HogConfig.getLong(config,"SMTPTalkers.minBytes",20971520L) // (20*1024*1024 = 20M)
