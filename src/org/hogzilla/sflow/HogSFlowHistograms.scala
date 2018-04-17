@@ -215,7 +215,7 @@ object HogSFlowHistograms {
        kmeansResult
        .map({case (cluster,(distance,histogramName,histogramSize,keys,vector,memberIP)) =>
               (cluster,histogramName.subSequence(histogramName.lastIndexOf("-")+1, histogramName.length()).toString)
-        }).cache().toArray()
+        }).cache().collect().toArray
    
    
         val grouped = kmeansResult.groupByKey()

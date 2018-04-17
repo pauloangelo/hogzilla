@@ -130,8 +130,8 @@ object HogHTTP {
               map.put("flow:id",Bytes.toString(id.get).toString())
               HogHBaseRDD.columns.foreach { column => 
                 
-                val ret = result.getValue(Bytes.toBytes(column.split(":")(0).toString()),Bytes.toBytes(column.split(":")(1).toString()))
-                map.put(column, Bytes.toString(ret)) 
+                val ret = result.getValue(Bytes.toBytes(column.name.split(":")(0).toString()),Bytes.toBytes(column.name.split(":")(1).toString()))
+                map.put(column.name, Bytes.toString(ret)) 
         }
           if(map.get("flow:packet_size-1")==null) map.put("flow:packet_size-1","0")
           if(map.get("flow:inter_time-1")==null) map.put("flow:inter_time-1","0")

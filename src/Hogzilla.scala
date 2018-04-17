@@ -26,6 +26,7 @@ import org.hogzilla.sflow._
 import org.hogzilla.http.HogHTTP
 import org.hogzilla.auth.HogAuth
 import org.hogzilla.dns.HogDNS
+import org.hogzilla.snort.HogSnort
 
 /**
  * 
@@ -53,6 +54,9 @@ object Hogzilla {
  
     // Prepare the data
     HogPrepare.prepare(HogRDD)
+   
+    // General module
+    HogSnort.run(HogRDD,spark)
     
     // Run algorithms for DNS protocol
     HogDNS.run(HogRDD,spark);
@@ -62,6 +66,7 @@ object Hogzilla {
     
     // Run algorithms for SMTP protocol
     //HogSMTP.run(HogRDD);
+    
     
     // ============================ Run algorithms for SFlows ============================
     
@@ -75,6 +80,7 @@ object Hogzilla {
     // Use continuous mode
     //val HogRDDAuth = HogHBaseRDD.connectAuth(spark);
     //HogAuth.run(HogRDDAuth,spark);
+    
      
     
     // Stop Spark

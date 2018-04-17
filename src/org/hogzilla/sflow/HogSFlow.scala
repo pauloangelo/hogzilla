@@ -1129,7 +1129,7 @@ object HogSFlow {
          case ((myIP,alienIP),(bytesUp,bytesDown,numberPkts,flowSet,numberOfflows,sampleRate)) =>
               println("FTP Communication "+myIP+ " <?> "+alienIP)
               (myIP,alienIP)
-      }).toArray().toSet
+      }).collect().toSet
   
       
       
@@ -1211,7 +1211,7 @@ object HogSFlow {
          populateP2PCommunication(event).alert()
          
          myIP
-     }).toArray().toSet
+     }).collect().toSet
   
     
     
@@ -1279,7 +1279,7 @@ object HogSFlow {
          populateP2PCommunication(event).alert()
          
          myIP
-    }).toArray.toSet
+    }).collect().toSet
     
     val p2pTalkers = p2pTalkers1st ++ p2pTalkers2nd
   
@@ -1359,7 +1359,7 @@ object HogSFlow {
          populateMediaClient(event).alert()
          
          myIP
-    }).toArray.toSet
+    }).collect().toSet
 
   
   

@@ -137,8 +137,8 @@ object HogDNS {
               map.put("flow:id",Bytes.toString(id.get).toString())
               HogHBaseRDD.columns.foreach { column => 
                 
-                val ret = result.getValue(Bytes.toBytes(column.split(":")(0).toString()),Bytes.toBytes(column.split(":")(1).toString()))
-                map.put(column, Bytes.toString(ret)) 
+                val ret = result.getValue(Bytes.toBytes(column.name.split(":")(0).toString()),Bytes.toBytes(column.name.split(":")(1).toString()))
+                map.put(column.name, Bytes.toString(ret)) 
         }
           if(map.get("flow:dns_num_queries")==null) map.put("flow:dns_num_queries","0")
           if(map.get("flow:dns_num_answers")==null) map.put("flow:dns_num_answers","0")
@@ -394,8 +394,8 @@ object HogDNS {
               map.put("flow:id",Bytes.toString(id.get).toString())
               HogHBaseRDD.columns.foreach { column => 
                 
-                val ret = result.getValue(Bytes.toBytes(column.split(":")(0).toString()),Bytes.toBytes(column.split(":")(1).toString()))
-                map.put(column, Bytes.toString(ret)) 
+                val ret = result.getValue(Bytes.toBytes(column.name.split(":")(0).toString()),Bytes.toBytes(column.name.split(":")(1).toString()))
+                map.put(column.name, Bytes.toString(ret)) 
         }
           if(map.get("flow:dns_num_queries")==null) map.put("flow:dns_num_queries","0")
           if(map.get("flow:dns_num_answers")==null) map.put("flow:dns_num_answers","0")

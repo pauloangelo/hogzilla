@@ -152,19 +152,19 @@ object HogHBaseHistogram {
                                                 classOf[org.apache.hadoop.hbase.client.Result])
 
     hBaseRDD
-    .map ({  case (id,result) => 
-                 val port    = Bytes.toString(result.getValue(Bytes.toBytes("values"),Bytes.toBytes(filterPort)))
-                 val name    = Bytes.toString(result.getValue(Bytes.toBytes("info"),Bytes.toBytes("name")))
-                 val size    = Bytes.toString(result.getValue(Bytes.toBytes("info"),Bytes.toBytes("size")))
-                 if(port==null || port.isEmpty())
-                  (Histograms.getIPFromHistName(name),size,0D)
-                 else
-                  (Histograms.getIPFromHistName(name),size,port.toDouble)
-        })
-    .filter({case (ip,size,port) =>  port > Histograms.atypicalThreshold})
-    .map({case (ip,size,port) => ip})
-    .toArray()
-    .toSet
+          .map ({  case (id,result) => 
+                       val port    = Bytes.toString(result.getValue(Bytes.toBytes("values"),Bytes.toBytes(filterPort)))
+                       val name    = Bytes.toString(result.getValue(Bytes.toBytes("info"),Bytes.toBytes("name")))
+                       val size    = Bytes.toString(result.getValue(Bytes.toBytes("info"),Bytes.toBytes("size")))
+                       if(port==null || port.isEmpty())
+                        (Histograms.getIPFromHistName(name),size,0D)
+                       else
+                        (Histograms.getIPFromHistName(name),size,port.toDouble)
+              })
+          .filter({case (ip,size,port) =>  port > Histograms.atypicalThreshold})
+          .map({case (ip,size,port) => ip})
+          .collect
+          .toSet
   }
 
 }
