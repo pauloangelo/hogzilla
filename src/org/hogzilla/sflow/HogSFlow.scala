@@ -134,7 +134,7 @@ object HogSFlow {
    val mediaClientUploadThreshold                  = HogConfig.getLong(config,"mediaStreaming.maxUploadBytes",10000000L) // ~10MB
    val mediaClientDownloadThreshold                = HogConfig.getLong(config,"mediaStreaming.minDownloadBytes",1000000L) // 1MB
    val mediaClientExcludedPorts                    = HogConfig.getSetString(config,"mediaStreaming.excludePorts",Set("1194")) 
-   val dnsTunnelThreshold                          = HogConfig.getLong(config,"dnsTunnel.minBytes",50000000L) // ~50 MB
+   val dnsTunnelThreshold                          = HogConfig.getLong(config,"dnsTunnel.minBytes",25000000L) // ~25 MB
    val bigProviderThreshold                        = HogConfig.getLong(config,"bigProviders.minBytes",1073741824L) // (1*1024*1024*1024 = 1G)
    val icmpTunnelThreshold                         = HogConfig.getInt (config,"ICMPTunnel.minPacket",200) // 200b
    val icmpTotalTunnelThreshold                    = HogConfig.getLong(config,"ICMPTunnel.minBytes",100000000L) // ~100MB 
@@ -148,6 +148,7 @@ object HogSFlow {
    val ddosExceptionAlienPorts:Set[String]         = HogConfig.getSetString(config,"hPortScan.excludeAlienPorts",Set("80","443","587","465","993","995")) 
    val FlowListLimit                               = HogConfig.getInt (config,"alert.maxFlowList",1000)
    val CCminPktsPerFlow                            = HogConfig.getInt (config,"BotNet.minPktsPerFlow",20)
+   val UDPamplifierPktNumThreshold                 = HogConfig.getInt (config,"UDPAmplifier.minPktsPerFlow",2000)
   
    
    val disable_abusedSMTP          = HogConfig.getInt(config,"abusedSMTP.disabled",0)
@@ -2161,6 +2162,7 @@ if(disable_atypicalAlienPorts<=1)
                         myPort.equals("1900")
                       ) &
                       proto.equals("UDP")      &
+                      numberPkts*sampleRate > UDPamplifierPktNumThreshold &
                       bytesUp/numberPkts > 250   &
                       !isMyIP(alienIP,myNets)  &
                     !UDPAmplifierExcludedIPs.contains(myIP) &
@@ -2180,7 +2182,8 @@ if(disable_atypicalAlienPorts<=1)
                         (bytesUpA+bytesUpB,bytesDownA+bytesDownB, numberPktsA+numberPktsB, flowSetA++flowSetB, connectionsA+connectionsB,(sampleRateA+sampleRateB)/2)
                 })
     .filter({ case  (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) => 
-                    numberPkts>400
+                    //numberPkts*sampleRate > 10
+                    true
            })
     .sortBy({ 
               case   (myIP,(bytesUp,bytesDown,numberPkts,flowSet,connections,sampleRate)) =>    bytesUp  
@@ -2281,7 +2284,8 @@ if(disable_atypicalAlienPorts<=1)
                   =>  
                       alienPort.equals("53") &
                       proto.equals("UDP")  &
-                      (bytesUp+bytesDown)*sampleRate > dnsTunnelThreshold &
+                      bytesUp*sampleRate > dnsTunnelThreshold &
+                      bytesDown*sampleRate > dnsTunnelThreshold &
                       !isMyIP(alienIP,myNets) &
                     !dnsTunnelExcludedIPs.contains(myIP) &
                     !dnsTunnelExcludedIPs.contains(alienIP) 
@@ -2292,7 +2296,6 @@ if(disable_atypicalAlienPorts<=1)
                flowSet.add((myIP,myPort,alienIP,alienPort,proto,bytesUp,bytesDown,numberPkts,direction,beginTime,endTime,sampleRate,status))
                (myIP,(bytesUp,bytesDown,numberPkts,flowSet,1L,sampleRate))
         })
-  
   
   dnsTunnelCollection
     .reduceByKey({
